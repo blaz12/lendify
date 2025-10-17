@@ -2,17 +2,17 @@
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
-const bcrypt = require('bcrypt'); // For hashing passwords
+const bcrypt = require('bcrypt');
 
 // --- CONFIGURATION ---
 const app = express();
 const port = 3000;
-const saltRounds = 10; // For bcrypt hashing
+const saltRounds = 10;
 
 const dbConfig = {
   host: 'localhost',
   user: 'root',
-  password: '', // Your MySQL password (blank by default in XAMPP)
+  password: '', // Assumes default XAMPP password (blank)
   database: 'lendify_db',
   waitForConnections: true,
   connectionLimit: 10,
@@ -26,28 +26,14 @@ app.use(express.json());
 // --- DATABASE CONNECTION ---
 const pool = mysql.createPool(dbConfig);
 
-// --- HELPER FUNCTION FOR ERROR HANDLING ---
-const handleQuery = async (res, query, params = []) => {
-  try {
-    const [results] = await pool.query(query, params);
-    return results;
-  } catch (error) {
-    // This is a generic error handler. We'll add more specific ones below.
-    console.error("Database query error:", error);
-    res.status(500).json({ error: 'A database error occurred.' });
-    return null;
-  }
-};
-
-// --- API ROUTES (ENDPOINTS) ---
+// --- API ROUTES ---
 
 // Test route to confirm the server is running
 app.get('/', (req, res) => {
-  res.send('Lendify API Server is running!');
+  res.status(200).send('Lendify API Server is running and ready!');
 });
 
 // === AUTHENTICATION API ===
-
 app.post('/api/register', async (req, res) => {
     const { name, studentId, email, password } = req.body;
     if (!name || !studentId || !email || !password) {
@@ -57,12 +43,8 @@ app.post('/api/register', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, saltRounds);
         const query = 'INSERT INTO users (name, studentId, email, password) VALUES (?, ?, ?, ?)';
         const [results] = await pool.query(query, [name, studentId, email, hashedPassword]);
-        
-        // Respond with the new user's data (excluding password)
         res.status(201).json({ id: results.insertId, name, studentId, email, role: 'student' });
-
     } catch (error) {
-        // Check for duplicate entry error (MySQL error code ER_DUP_ENTRY)
         if (error.code === 'ER_DUP_ENTRY') {
              res.status(409).json({ error: 'Student ID or email already exists.' });
         } else {
@@ -77,39 +59,48 @@ app.post('/api/login', async (req, res) => {
     if (!studentId || !password) {
         return res.status(400).json({ error: 'Student ID and password are required.' });
     }
-    
-    const users = await handleQuery(res, 'SELECT * FROM users WHERE studentId = ?', [studentId]);
-    if (users && users.length > 0) {
-        const user = users[0];
-        // Compare the provided password with the hashed password in the database
-        const passwordMatch = await bcrypt.compare(password, user.password);
-        if (passwordMatch) {
-            // Successful login, return user data without the password
-            const { password, ...userWithoutPassword } = user;
-            res.json(userWithoutPassword);
+    try {
+        const [users] = await pool.query('SELECT * FROM users WHERE studentId = ?', [studentId]);
+        if (users.length > 0) {
+            const user = users[0];
+            const passwordMatch = await bcrypt.compare(password, user.password);
+            if (passwordMatch) {
+                const { password, ...userWithoutPassword } = user;
+                res.json(userWithoutPassword);
+            } else {
+                res.status(401).json({ error: 'Invalid credentials.' });
+            }
         } else {
-            // Password does not match
             res.status(401).json({ error: 'Invalid credentials.' });
         }
-    } else if (users) {
-        // User not found
-        res.status(401).json({ error: 'Invalid credentials.' });
+    } catch (error) {
+        console.error("Login error:", error);
+        res.status(500).json({ error: 'A server error occurred during login.' });
     }
 });
 
-
-// === ITEMS API (Admin protected in a real app) ===
+// === ITEMS API ===
 app.get('/api/items', async (req, res) => {
-  const results = await handleQuery(res, 'SELECT * FROM items ORDER BY name ASC');
-  if (results) res.json(results);
+    try {
+        const [results] = await pool.query('SELECT * FROM items ORDER BY name ASC');
+        res.json(results);
+    } catch (error) {
+        console.error("Get items error:", error);
+        res.status(500).json({ error: 'Failed to retrieve items.' });
+    }
 });
 
 app.post('/api/items', async (req, res) => {
-  const { name, category, stock, location } = req.body;
-  const status = Number(stock) > 0 ? 'Available' : 'Out of Stock';
-  const query = 'INSERT INTO items (name, category, stock, location, status) VALUES (?, ?, ?, ?, ?)';
-  const results = await handleQuery(res, query, [name, category, stock, location, status]);
-  if (results) res.status(201).json({ id: results.insertId, ...req.body, status });
+    const { name, category, stock, location } = req.body;
+    const status = Number(stock) > 0 ? 'Available' : 'Out of Stock';
+    const query = 'INSERT INTO items (name, category, stock, location, status) VALUES (?, ?, ?, ?, ?)';
+    try {
+        const [results] = await pool.query(query, [name, category, stock, location, status]);
+        res.status(201).json({ id: results.insertId, ...req.body, status });
+    } catch (error) {
+        console.error("Create item error:", error);
+        res.status(500).json({ error: 'Failed to create item.' });
+    }
 });
 
 app.put('/api/items/:id', async (req, res) => {
@@ -117,37 +108,49 @@ app.put('/api/items/:id', async (req, res) => {
     const { name, category, stock, location } = req.body;
     const status = Number(stock) > 0 ? 'Available' : 'Out of Stock';
     const query = 'UPDATE items SET name = ?, category = ?, stock = ?, location = ?, status = ? WHERE id = ?';
-    const results = await handleQuery(res, query, [name, category, stock, location, status, id]);
-    if (results && results.affectedRows > 0) {
-        res.json({ id: parseInt(id, 10), ...req.body, status });
-    } else if (results) {
-        res.status(404).json({ error: 'Item not found' });
+    try {
+        const [results] = await pool.query(query, [name, category, stock, location, status, id]);
+        if (results.affectedRows > 0) {
+            res.json({ id: parseInt(id, 10), ...req.body, status });
+        } else {
+            res.status(404).json({ error: 'Item not found' });
+        }
+    } catch (error) {
+        console.error("Update item error:", error);
+        res.status(500).json({ error: 'Failed to update item.' });
     }
 });
 
 app.delete('/api/items/:id', async (req, res) => {
     const { id } = req.params;
-    const results = await handleQuery(res, 'DELETE FROM items WHERE id = ?', [id]);
-    if (results && results.affectedRows > 0) {
-        res.status(204).send();
-    } else if (results) {
-        res.status(404).json({ error: 'Item not found' });
+    try {
+        const [results] = await pool.query('DELETE FROM items WHERE id = ?', [id]);
+        if (results.affectedRows > 0) {
+            res.status(204).send();
+        } else {
+            res.status(404).json({ error: 'Item not found' });
+        }
+    } catch (error) {
+        console.error("Delete item error:", error);
+        res.status(500).json({ error: 'Failed to delete item.' });
     }
 });
 
-// === USERS API (Admin protected in a real app) ===
+// === USERS API ===
 app.get('/api/users', async (req, res) => {
-    // Select all fields except the password hash for security
     const query = "SELECT id, name, studentId, email, role, createdAt FROM users ORDER BY name ASC";
-    const results = await handleQuery(res, query);
-    if (results) res.json(results);
+    try {
+        const [results] = await pool.query(query);
+        res.json(results);
+    } catch (error) {
+        console.error("Get users error:", error);
+        res.status(500).json({ error: 'Failed to retrieve users.' });
+    }
 });
 
-// POST (create) a new user - FOR ADMINS
 app.post('/api/users', async (req, res) => {
     const { name, studentId, email, role } = req.body;
-    // Admins can create users with a default password.
-    const defaultPassword = 'password123'; // Consider making this more secure or configurable
+    const defaultPassword = 'password123';
     try {
         const hashedPassword = await bcrypt.hash(defaultPassword, saltRounds);
         const query = 'INSERT INTO users (name, studentId, email, password, role) VALUES (?, ?, ?, ?, ?)';
@@ -155,7 +158,7 @@ app.post('/api/users', async (req, res) => {
         res.status(201).json({ id: results.insertId, name, studentId, email, role: role || 'student' });
     } catch (error) {
         if (error.code === 'ER_DUP_ENTRY') {
-             res.status(409).json({ error: 'Student ID or email already exists.' });
+            res.status(409).json({ error: 'Student ID or email already exists.' });
         } else {
             console.error("Admin user creation error:", error);
             res.status(500).json({ error: 'Failed to create user.' });
@@ -163,27 +166,35 @@ app.post('/api/users', async (req, res) => {
     }
 });
 
-
 app.put('/api/users/:id', async (req, res) => {
     const { id } = req.params;
     const { name, studentId, email, role } = req.body;
-    // Note: Password changes should be a separate, more secure endpoint and are omitted here for simplicity.
     const query = 'UPDATE users SET name = ?, studentId = ?, email = ?, role = ? WHERE id = ?';
-    const results = await handleQuery(res, query, [name, studentId, email, role, id]);
-    if (results && results.affectedRows > 0) {
-        res.json({ id: parseInt(id, 10), name, studentId, email, role });
-    } else if (results) {
-        res.status(404).json({ error: 'User not found' });
+    try {
+        const [results] = await pool.query(query, [name, studentId, email, role, id]);
+        if (results.affectedRows > 0) {
+            res.json({ id: parseInt(id, 10), name, studentId, email, role });
+        } else {
+            res.status(404).json({ error: 'User not found' });
+        }
+    } catch (error) {
+        console.error("Update user error:", error);
+        res.status(500).json({ error: 'Failed to update user.' });
     }
 });
 
 app.delete('/api/users/:id', async (req, res) => {
     const { id } = req.params;
-    const results = await handleQuery(res, 'DELETE FROM users WHERE id = ?', [id]);
-    if (results && results.affectedRows > 0) {
-        res.status(204).send();
-    } else if (results) {
-        res.status(404).json({ error: 'User not found' });
+    try {
+        const [results] = await pool.query('DELETE FROM users WHERE id = ?', [id]);
+        if (results.affectedRows > 0) {
+            res.status(204).send();
+        } else {
+            res.status(404).json({ error: 'User not found' });
+        }
+    } catch (error) {
+        console.error("Delete user error:", error);
+        res.status(500).json({ error: 'Failed to delete user.' });
     }
 });
 
@@ -196,8 +207,13 @@ app.get('/api/borrow_records', async (req, res) => {
         JOIN items i ON br.itemId = i.id
         ORDER BY br.borrowedDate DESC
     `;
-    const results = await handleQuery(res, query);
-    if (results) res.json(results);
+    try {
+        const [results] = await pool.query(query);
+        res.json(results);
+    } catch (error) {
+        console.error("Get borrow records error:", error);
+        res.status(500).json({ error: 'Failed to retrieve borrow records.' });
+    }
 });
 
 app.post('/api/borrow', async (req, res) => {

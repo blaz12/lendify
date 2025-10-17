@@ -1,6 +1,4 @@
-import { Component, signal } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
-import { ChangeDetectionStrategy, computed, WritableSignal, OnInit, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, signal, WritableSignal, OnInit, inject } from '@angular/core';
 import { CommonModule, formatDate } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpClientModule, HttpErrorResponse } from '@angular/common/http';
@@ -13,7 +11,7 @@ interface LendifyUser {
     studentId: string;
     email: string;
     role: 'admin' | 'student';
-    createdAt?: string; // Optional from the server
+    createdAt?: string;
 }
 
 interface EquipmentItem {
@@ -617,7 +615,7 @@ export class App implements OnInit {
                 this.users.update(users => [...users, newUser]);
                 this.showNotification('User added successfully. Default password is "password123".', 'success');
             }
-            this.isUserModalOpen.set(false);
+            this.isItemModalOpen.set(false);
         } catch (error) {
             this.handleApiError(error, "Failed to save user.");
         }
