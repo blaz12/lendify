@@ -13,7 +13,7 @@ const port = 3000; // You can change this port if needed
 const dbConfig = {
   host: 'localhost',
   user: 'root', // Your MySQL username
-  password: 'your_password', // Your MySQL password
+  password: '', // Your MySQL password
   database: 'lendify_db' // The name of your database
 };
 
