@@ -41,6 +41,11 @@ const handleQuery = async (res, query, params = []) => {
 
 // --- API ROUTES (ENDPOINTS) ---
 
+// Test route to confirm the server is running
+app.get('/', (req, res) => {
+  res.send('Lendify API Server is running!');
+});
+
 // === AUTHENTICATION API ===
 
 app.post('/api/register', async (req, res) => {
@@ -137,6 +142,27 @@ app.get('/api/users', async (req, res) => {
     const results = await handleQuery(res, query);
     if (results) res.json(results);
 });
+
+// POST (create) a new user - FOR ADMINS
+app.post('/api/users', async (req, res) => {
+    const { name, studentId, email, role } = req.body;
+    // Admins can create users with a default password.
+    const defaultPassword = 'password123'; // Consider making this more secure or configurable
+    try {
+        const hashedPassword = await bcrypt.hash(defaultPassword, saltRounds);
+        const query = 'INSERT INTO users (name, studentId, email, password, role) VALUES (?, ?, ?, ?, ?)';
+        const [results] = await pool.query(query, [name, studentId, email, hashedPassword, role || 'student']);
+        res.status(201).json({ id: results.insertId, name, studentId, email, role: role || 'student' });
+    } catch (error) {
+        if (error.code === 'ER_DUP_ENTRY') {
+             res.status(409).json({ error: 'Student ID or email already exists.' });
+        } else {
+            console.error("Admin user creation error:", error);
+            res.status(500).json({ error: 'Failed to create user.' });
+        }
+    }
+});
+
 
 app.put('/api/users/:id', async (req, res) => {
     const { id } = req.params;
