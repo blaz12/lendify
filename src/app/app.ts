@@ -1,18 +1,19 @@
 import { Component, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { ChangeDetectionStrategy, computed, WritableSignal, OnInit, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, formatDate } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient, HttpClientModule } from '@angular/common/http'; // <-- IMPORTED HttpClientModule
+import { HttpClient, HttpClientModule, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 
-// --- TYPE DEFINITIONS (Updated for MySQL) ---
-// Note: IDs are now numbers, and dates will be strings from the API.
+// --- TYPE DEFINITIONS ---
 interface LendifyUser {
     id: number;
     name: string;
     studentId: string;
     email: string;
+    role: 'admin' | 'student';
+    createdAt?: string; // Optional from the server
 }
 
 interface EquipmentItem {
@@ -27,20 +28,21 @@ interface EquipmentItem {
 interface BorrowRecord {
     id: number;
     userId: number;
-    userName: string; 
+    userName: string;
     itemId: number;
-    itemName: string; 
-    borrowedDate: string; // Comes as a string from MySQL
+    itemName: string;
+    borrowedDate: string;
     returnedDate: string | null;
     status: 'Borrowed' | 'Returned';
 }
 
 type Page = 'dashboard' | 'items' | 'borrow' | 'return' | 'users';
+type AuthView = 'login' | 'register';
 
 @Component({
     selector: 'app-root',
     standalone: true,
-    imports: [CommonModule, FormsModule, HttpClientModule], // <-- ADDED HttpClientModule HERE
+    imports: [CommonModule, FormsModule, HttpClientModule],
     changeDetection: ChangeDetectionStrategy.OnPush,
     styles: [`
       /* Custom scrollbar for better aesthetics */
@@ -53,11 +55,8 @@ type Page = 'dashboard' | 'items' | 'borrow' | 'return' | 'users';
       .notification { position: fixed; top: 20px; right: 20px; z-index: 2000; transition: opacity 0.3s ease-in-out; }
     `],
     template: `
-    <!-- This template remains largely the same, but now its data is powered by your MySQL server -->
     <div class="antialiased text-slate-700 bg-slate-50 min-h-screen">
-        <!-- Main Container -->
         <div class="flex min-h-screen">
-
             <!-- Sidebar Navigation -->
             @if (currentUser()) {
               <aside class="w-64 bg-white shadow-md flex-shrink-0 flex flex-col">
@@ -68,15 +67,18 @@ type Page = 'dashboard' | 'items' | 'borrow' | 'return' | 'users';
                   <nav class="p-4 flex-grow">
                       <ul>
                           @for (item of navigationItems; track item.id) {
-                            <li>
-                                <a (click)="currentPage.set(item.id)"
-                                   [class.bg-indigo-100]="currentPage() === item.id"
-                                   [class.text-indigo-600]="currentPage() === item.id"
-                                   class="flex items-center p-3 my-1 rounded-lg cursor-pointer hover:bg-indigo-50 transition-colors">
-                                    <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" [attr.d]="item.icon"></path></svg>
-                                    <span>{{ item.label }}</span>
-                                </a>
-                            </li>
+                            <!-- Conditional rendering for admin links -->
+                            @if (item.adminOnly === false || (item.adminOnly === true && currentUser()?.role === 'admin')) {
+                                <li>
+                                    <a (click)="currentPage.set(item.id)"
+                                       [class.bg-indigo-100]="currentPage() === item.id"
+                                       [class.text-indigo-600]="currentPage() === item.id"
+                                       class="flex items-center p-3 my-1 rounded-lg cursor-pointer hover:bg-indigo-50 transition-colors">
+                                        <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" [attr.d]="item.icon"></path></svg>
+                                        <span>{{ item.label }}</span>
+                                    </a>
+                                </li>
+                            }
                           }
                       </ul>
                   </nav>
@@ -98,23 +100,64 @@ type Page = 'dashboard' | 'items' | 'borrow' | 'return' | 'users';
             <!-- Main Content -->
             <main class="flex-1 p-8 overflow-y-auto">
                 @if (!currentUser()) {
-                    <!-- Login View -->
+                    <!-- Login / Register View -->
                     <div class="flex items-center justify-center h-full">
                         <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-xl shadow-lg">
-                            <h2 class="text-3xl font-bold text-center text-gray-800">Welcome to Lendify</h2>
-                            <p class="text-center text-gray-500">Please sign in with your Student ID</p>
-                            <div>
-                                <label for="studentId" class="text-sm font-medium text-gray-700">Student ID</label>
-                                <input #loginId type="text" id="studentId" (keyup.enter)="login(loginId.value)"
-                                       class="w-full px-4 py-2 mt-2 text-base text-gray-700 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                                       placeholder="e.g., 12345678">
-                            </div>
-                            <button (click)="login(loginId.value)"
-                                    class="w-full px-4 py-2 font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200">
-                                Login
-                            </button>
-                             @if(loginError()) {
-                                <p class="text-sm text-red-500 text-center">{{ loginError() }}</p>
+                             @if(authView() === 'login') {
+                                <h2 class="text-3xl font-bold text-center text-gray-800">Welcome Back</h2>
+                                <p class="text-center text-gray-500">Sign in to continue</p>
+                                
+                                <div>
+                                    <label for="studentId" class="text-sm font-medium text-gray-700">Student ID</label>
+                                    <input #loginId type="text" id="studentId"
+                                           class="w-full px-4 py-2 mt-2 text-base text-gray-700 bg-gray-100 border rounded-lg focus:outline-none"
+                                           placeholder="e.g., 12345678">
+                                </div>
+                                <div>
+                                    <label for="password" class="text-sm font-medium text-gray-700">Password</label>
+                                    <input #loginPass type="password" id="password" (keyup.enter)="login(loginId.value, loginPass.value)"
+                                           class="w-full px-4 py-2 mt-2 text-base text-gray-700 bg-gray-100 border rounded-lg focus:outline-none"
+                                           placeholder="••••••••">
+                                </div>
+
+                                <button (click)="login(loginId.value, loginPass.value)"
+                                        class="w-full px-4 py-2 font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
+                                    Login
+                                </button>
+                                <p class="text-center text-sm">Don't have an account? 
+                                    <a (click)="authView.set('register')" class="font-medium text-indigo-600 hover:underline cursor-pointer">Register here</a>
+                                </p>
+                             } @else {
+                                <h2 class="text-3xl font-bold text-center text-gray-800">Create Account</h2>
+                                <p class="text-center text-gray-500">Get started with Lendify</p>
+
+                                <div>
+                                    <label class="text-sm font-medium">Full Name</label>
+                                    <input #regName type="text" class="w-full px-4 py-2 mt-1 bg-gray-100 border rounded-lg" placeholder="e.g., Jane Doe">
+                                </div>
+                                <div>
+                                    <label class="text-sm font-medium">Student ID</label>
+                                    <input #regId type="text" class="w-full px-4 py-2 mt-1 bg-gray-100 border rounded-lg" placeholder="e.g., 87654321">
+                                </div>
+                                <div>
+                                    <label class="text-sm font-medium">Email</label>
+                                    <input #regEmail type="email" class="w-full px-4 py-2 mt-1 bg-gray-100 border rounded-lg" placeholder="e.g., jane.doe@university.edu">
+                                </div>
+                                <div>
+                                    <label class="text-sm font-medium">Password</label>
+                                    <input #regPass type="password" class="w-full px-4 py-2 mt-1 bg-gray-100 border rounded-lg" placeholder="••••••••">
+                                </div>
+
+                                <button (click)="register(regName.value, regId.value, regEmail.value, regPass.value)"
+                                        class="w-full px-4 py-2 font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
+                                    Register
+                                </button>
+                                <p class="text-center text-sm">Already have an account? 
+                                    <a (click)="authView.set('login')" class="font-medium text-indigo-600 hover:underline cursor-pointer">Login here</a>
+                                </p>
+                             }
+                            @if(authError()) {
+                                <p class="text-sm text-red-500 text-center p-2 bg-red-50 rounded-md">{{ authError() }}</p>
                             }
                         </div>
                     </div>
@@ -130,8 +173,6 @@ type Page = 'dashboard' | 'items' | 'borrow' | 'return' | 'users';
                 }
             </main>
         </div>
-
-        <!-- Templates for different views -->
 
         <!-- Dashboard View -->
         <ng-template #dashboardView>
@@ -271,7 +312,7 @@ type Page = 'dashboard' | 'items' | 'borrow' | 'return' | 'users';
                                 <td class="px-6 py-4 font-medium text-gray-900">{{ record.itemName }}</td>
                                 <td class="px-6 py-4">{{ record.borrowedDate | date:'medium' }}</td>
                                 <td class="px-6 py-4">
-                                    <button (click)="returnItem(record)" class="px-4 py-2 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700">Return</button>
+                                    <button (click)="returnItem(record.id)" class="px-4 py-2 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700">Return</button>
                                 </td>
                             </tr>
                         }
@@ -282,6 +323,7 @@ type Page = 'dashboard' | 'items' | 'borrow' | 'return' | 'users';
                 }
             </div>
         </ng-template>
+
 
         <!-- User Management View -->
         <ng-template #usersView>
@@ -296,6 +338,7 @@ type Page = 'dashboard' | 'items' | 'borrow' | 'return' | 'users';
                             <th scope="col" class="px-6 py-3">Name</th>
                             <th scope="col" class="px-6 py-3">Student ID</th>
                             <th scope="col" class="px-6 py-3">Email</th>
+                            <th scope="col" class="px-6 py-3">Role</th>
                             <th scope="col" class="px-6 py-3">Actions</th>
                         </tr>
                     </thead>
@@ -305,6 +348,7 @@ type Page = 'dashboard' | 'items' | 'borrow' | 'return' | 'users';
                                 <td class="px-6 py-4 font-medium text-gray-900">{{ user.name }}</td>
                                 <td class="px-6 py-4">{{ user.studentId }}</td>
                                 <td class="px-6 py-4">{{ user.email }}</td>
+                                <td class="px-6 py-4 capitalize">{{ user.role }}</td>
                                 <td class="px-6 py-4 flex space-x-2">
                                     <button (click)="openUserModal(user)" class="text-indigo-600 hover:text-indigo-900">Edit</button>
                                     <button (click)="deleteUser(user.id)" class="text-red-600 hover:text-red-900">Delete</button>
@@ -326,19 +370,19 @@ type Page = 'dashboard' | 'items' | 'borrow' | 'return' | 'users';
                     <h3 class="text-2xl font-bold">{{ editingItem() ? 'Edit' : 'Add' }} Item</h3>
                     <div>
                         <label class="text-sm font-medium">Name</label>
-                        <input [(ngModel)]="itemForm.name" class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" type="text" placeholder="e.g., MacBook Pro 14">
+                        <input [(ngModel)]="itemForm.name" class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg" type="text">
                     </div>
                      <div>
                         <label class="text-sm font-medium">Category</label>
-                        <input [(ngModel)]="itemForm.category" class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" type="text" placeholder="e.g., Electronics">
+                        <input [(ngModel)]="itemForm.category" class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg" type="text">
                     </div>
                      <div>
                         <label class="text-sm font-medium">Stock</label>
-                        <input [(ngModel)]="itemForm.stock" class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" type="number" min="0">
+                        <input [(ngModel)]="itemForm.stock" class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg" type="number" min="0">
                     </div>
                      <div>
                         <label class="text-sm font-medium">Location</label>
-                        <input [(ngModel)]="itemForm.location" class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" type="text" placeholder="e.g., Library Room 201">
+                        <input [(ngModel)]="itemForm.location" class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg" type="text">
                     </div>
                     <div class="flex justify-end space-x-4 pt-4">
                         <button (click)="isItemModalOpen.set(false)" class="px-4 py-2 font-semibold text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
@@ -354,15 +398,22 @@ type Page = 'dashboard' | 'items' | 'borrow' | 'return' | 'users';
                     <h3 class="text-2xl font-bold">{{ editingUser() ? 'Edit' : 'Add' }} User</h3>
                     <div>
                         <label class="text-sm font-medium">Full Name</label>
-                        <input [(ngModel)]="userForm.name" class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" type="text" placeholder="e.g., John Doe">
+                        <input [(ngModel)]="userForm.name" class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg" type="text">
                     </div>
                      <div>
                         <label class="text-sm font-medium">Student ID</label>
-                        <input [(ngModel)]="userForm.studentId" class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" type="text" placeholder="e.g., 12345678">
+                        <input [(ngModel)]="userForm.studentId" class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg" type="text">
                     </div>
                      <div>
                         <label class="text-sm font-medium">Email</label>
-                        <input [(ngModel)]="userForm.email" class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" type="email" placeholder="e.g., john.doe@university.edu">
+                        <input [(ngModel)]="userForm.email" class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg" type="email">
+                    </div>
+                     <div>
+                        <label class="text-sm font-medium">Role</label>
+                        <select [(ngModel)]="userForm.role" class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg">
+                            <option value="student">Student</option>
+                            <option value="admin">Admin</option>
+                        </select>
                     </div>
                     <div class="flex justify-end space-x-4 pt-4">
                         <button (click)="isUserModalOpen.set(false)" class="px-4 py-2 font-semibold text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
@@ -384,10 +435,11 @@ type Page = 'dashboard' | 'items' | 'borrow' | 'return' | 'users';
     `
 })
 export class App implements OnInit {
-    // --- STATE MANAGEMENT (Signals) ---
+    // --- STATE MANAGEMENT ---
     currentPage = signal<Page>('dashboard');
     currentUser: WritableSignal<LendifyUser | null> = signal(null);
-    loginError = signal<string | null>(null);
+    authView = signal<AuthView>('login');
+    authError = signal<string | null>(null);
 
     // Data signals
     users = signal<LendifyUser[]>([]);
@@ -397,49 +449,221 @@ export class App implements OnInit {
     // Modal states
     isItemModalOpen = signal(false);
     editingItem: WritableSignal<EquipmentItem | null> = signal(null);
-    itemForm!: EquipmentItem; // Initialized in openItemModal
+    itemForm!: EquipmentItem; 
 
     isUserModalOpen = signal(false);
     editingUser: WritableSignal<LendifyUser | null> = signal(null);
-    userForm!: LendifyUser; // Initialized in openUserModal
+    userForm!: LendifyUser;
 
-    // Notification signal
     notification = signal<{ message: string; type: 'success' | 'error' } | null>(null);
 
     // --- DEPENDENCY INJECTION ---
     private http = inject(HttpClient);
-    private readonly apiBaseUrl = 'http://localhost:3000/api'; // URL of your Node.js server
+    private readonly apiBaseUrl = 'http://localhost:3000/api';
 
     // --- NAVIGATION ---
-    navigationItems: { id: Page; label: string; icon: string }[] = [
-        { id: 'dashboard', label: 'Dashboard', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' },
-        { id: 'items', label: 'Manage Items', icon: 'M17 14v6m-3-3h6M6 10h2a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2zm10 0h2a2 2 0 002-2V6a2 2 0 00-2-2h-2a2 2 0 00-2 2v2a2 2 0 002 2zM6 20h2a2 2 0 002-2v-2a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2z' },
-        { id: 'borrow', label: 'Borrow Item', icon: 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z' },
-        { id: 'return', label: 'Return Item', icon: 'M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6' },
-        { id: 'users', label: 'Manage Users', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M15 21a6 6 0 00-9-5.197M15 21a6 6 0 00-6-6h6m6 0a6 6 0 00-6-6m6 6a6 6 0 00-6 6' },
+    navigationItems: { id: Page; label: string; icon: string; adminOnly: boolean }[] = [
+        { id: 'dashboard', label: 'Dashboard', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z', adminOnly: false },
+        { id: 'borrow', label: 'Borrow Item', icon: 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z', adminOnly: false },
+        { id: 'return', label: 'Return Item', icon: 'M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6', adminOnly: false },
+        { id: 'items', label: 'Manage Items', icon: 'M17 14v6m-3-3h6M6 10h2a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2zm10 0h2a2 2 0 002-2V6a2 2 0 00-2-2h-2a2 2 0 00-2 2v2a2 2 0 002 2zM6 20h2a2 2 0 002-2v-2a2 2 0 00-2-2H6a2 2 0 00-2 2v2a2 2 0 002 2z', adminOnly: true },
+        { id: 'users', label: 'Manage Users', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M15 21a6 6 0 00-9-5.197M15 21a6 6 0 00-6-6h6m6 0a6 6 0 00-6-6m6 6a6 6 0 00-6 6', adminOnly: true },
     ];
 
+    constructor() {
+        this.resetItemForm();
+        this.resetUserForm();
+    }
+
     ngOnInit(): void {
-        this.fetchAllData();
+        // Data is now fetched after a successful login
     }
 
     async fetchAllData() {
+        if(!this.currentUser()) return;
         try {
-            const users = await firstValueFrom(this.http.get<LendifyUser[]>(`${this.apiBaseUrl}/users`));
+            // Parallel fetching for performance
+            const [users, items, records] = await Promise.all([
+                firstValueFrom(this.http.get<LendifyUser[]>(`${this.apiBaseUrl}/users`)),
+                firstValueFrom(this.http.get<EquipmentItem[]>(`${this.apiBaseUrl}/items`)),
+                firstValueFrom(this.http.get<BorrowRecord[]>(`${this.apiBaseUrl}/borrow_records`))
+            ]);
+            
             this.users.set(users);
-            const items = await firstValueFrom(this.http.get<EquipmentItem[]>(`${this.apiBaseUrl}/items`));
             this.items.set(items);
-            const records = await firstValueFrom(this.http.get<BorrowRecord[]>(`${this.apiBaseUrl}/borrow_records`));
             this.borrowRecords.set(records);
+
         } catch (error) {
-            console.error("Failed to fetch initial data", error);
-            this.showNotification("Could not connect to the server.", "error");
+            this.showNotification("Could not connect to the server or fetch data.", "error");
+            console.error("Fetch data error:", error);
         }
     }
 
-    // --- COMPUTED SIGNALS ---
-    availableItems = computed(() => this.items().filter(item => item.status === 'Available' && item.stock > 0));
-    userBorrowedItems = computed(() => this.borrowRecords().filter(r => r.userId === this.currentUser()?.id && r.status === 'Borrowed'));
+    // --- AUTHENTICATION ---
+    async login(studentId: string, password: string) {
+        if (!studentId || !password) {
+            this.authError.set("Student ID and password are required.");
+            return;
+        }
+        try {
+            const user = await firstValueFrom(this.http.post<LendifyUser>(`${this.apiBaseUrl}/login`, { studentId, password }));
+            if (user) {
+                this.currentUser.set(user);
+                this.authError.set(null);
+                this.currentPage.set('dashboard');
+                await this.fetchAllData();
+            }
+        } catch (error) {
+            this.handleApiError(error, "Login failed. Please check your credentials.");
+        }
+    }
+
+    async register(name: string, studentId: string, email: string, password: string) {
+        if (!name || !studentId || !email || !password) {
+            this.authError.set("All registration fields are required.");
+            return;
+        }
+        try {
+            await firstValueFrom(this.http.post<LendifyUser>(`${this.apiBaseUrl}/register`, { name, studentId, email, password }));
+            this.showNotification("Registration successful! Please log in.", 'success');
+            this.authView.set('login');
+            this.authError.set(null);
+        } catch (error) {
+             this.handleApiError(error, "Registration failed.");
+        }
+    }
+
+    logout() {
+        this.currentUser.set(null);
+        this.currentPage.set('dashboard');
+        // Clear all data on logout
+        this.users.set([]);
+        this.items.set([]);
+        this.borrowRecords.set([]);
+    }
+
+    // --- CRUD OPERATIONS ---
+    // Item Modal
+    private resetItemForm() {
+        this.itemForm = { id: 0, name: '', category: '', stock: 0, location: '', status: 'Available' };
+    }
+    openItemModal(item?: EquipmentItem) {
+        if (item) {
+            this.editingItem.set(item);
+            this.itemForm = { ...item };
+        } else {
+            this.editingItem.set(null);
+            this.resetItemForm();
+        }
+        this.isItemModalOpen.set(true);
+    }
+    async saveItem() {
+        if (!this.itemForm.name || !this.itemForm.category) {
+            this.showNotification("Name and category are required.", "error");
+            return;
+        }
+        try {
+            if (this.editingItem()) {
+                const updatedItem = await firstValueFrom(this.http.put<EquipmentItem>(`${this.apiBaseUrl}/items/${this.editingItem()!.id}`, this.itemForm));
+                this.items.update(items => items.map(i => i.id === updatedItem.id ? updatedItem : i));
+                this.showNotification('Item updated successfully.', 'success');
+            } else {
+                const newItem = await firstValueFrom(this.http.post<EquipmentItem>(`${this.apiBaseUrl}/items`, this.itemForm));
+                this.items.update(items => [...items, newItem]);
+                this.showNotification('Item added successfully.', 'success');
+            }
+            this.isItemModalOpen.set(false);
+        } catch (error) {
+            this.handleApiError(error, "Failed to save item.");
+        }
+    }
+    async deleteItem(id: number) {
+        try {
+            await firstValueFrom(this.http.delete(`${this.apiBaseUrl}/items/${id}`));
+            this.items.update(items => items.filter(i => i.id !== id));
+            this.showNotification('Item deleted successfully.', 'success');
+        } catch (error) {
+            this.handleApiError(error, "Failed to delete item.");
+        }
+    }
+
+    // User Modal
+    private resetUserForm() {
+        this.userForm = { id: 0, name: '', studentId: '', email: '', role: 'student' };
+    }
+    openUserModal(user?: LendifyUser) {
+        if (user) {
+            this.editingUser.set(user);
+            this.userForm = { ...user };
+        } else {
+            this.editingUser.set(null);
+            this.resetUserForm();
+        }
+        this.isUserModalOpen.set(true);
+    }
+    async saveUser() {
+        if (!this.userForm.name || !this.userForm.studentId || !this.userForm.email) {
+            this.showNotification("Name, Student ID, and Email are required.", "error");
+            return;
+        }
+        try {
+            if (this.editingUser()) {
+                const updatedUser = await firstValueFrom(this.http.put<LendifyUser>(`${this.apiBaseUrl}/users/${this.editingUser()!.id}`, this.userForm));
+                this.users.update(users => users.map(u => u.id === updatedUser.id ? updatedUser : u));
+                this.showNotification('User updated successfully.', 'success');
+            } else {
+                // This now calls the admin user creation endpoint
+                const newUser = await firstValueFrom(this.http.post<LendifyUser>(`${this.apiBaseUrl}/users`, this.userForm));
+                this.users.update(users => [...users, newUser]);
+                this.showNotification('User added successfully. Default password is "password123".', 'success');
+            }
+            this.isUserModalOpen.set(false);
+        } catch (error) {
+            this.handleApiError(error, "Failed to save user.");
+        }
+    }
+    async deleteUser(id: number) {
+        try {
+            await firstValueFrom(this.http.delete(`${this.apiBaseUrl}/users/${id}`));
+            this.users.update(users => users.filter(u => u.id !== id));
+            this.showNotification('User deleted successfully.', 'success');
+        } catch (error) {
+            this.handleApiError(error, "Failed to delete user.");
+        }
+    }
+
+    // --- LENDING LOGIC ---
+    async borrowItem(item: EquipmentItem) {
+        if (!this.currentUser()) {
+            this.showNotification("You must be logged in to borrow items.", "error");
+            return;
+        }
+        try {
+            await firstValueFrom(this.http.post(`${this.apiBaseUrl}/borrow`, { userId: this.currentUser()!.id, itemId: item.id }));
+            this.showNotification(`Successfully borrowed ${item.name}.`, 'success');
+            this.fetchAllData(); // Refresh data to show stock changes and new records
+        } catch (error) {
+            this.handleApiError(error, "Failed to borrow item.");
+        }
+    }
+
+    async returnItem(recordId: number) {
+        try {
+            await firstValueFrom(this.http.put(`${this.apiBaseUrl}/return/${recordId}`, {}));
+            this.showNotification(`Item returned successfully.`, 'success');
+            this.fetchAllData(); // Refresh data
+        } catch (error) {
+            this.handleApiError(error, "Failed to return item.");
+        }
+    }
+
+    // --- COMPUTED SIGNALS & HELPERS ---
+    availableItems = computed(() => this.items().filter(item => item.stock > 0));
+    userBorrowedItems = computed(() => {
+        const currentUserId = this.currentUser()?.id;
+        if (!currentUserId) return [];
+        return this.borrowRecords().filter(r => r.userId === currentUserId && r.status === 'Borrowed');
+    });
     stats = computed(() => {
         const allItems = this.items();
         const categories = [...new Set(allItems.map(i => i.category))];
@@ -456,144 +680,19 @@ export class App implements OnInit {
         };
     });
 
-    // --- AUTHENTICATION ---
-    login(studentId: string) {
-        if (!studentId?.trim()) {
-            this.loginError.set("Student ID cannot be empty.");
-            return;
-        }
-        const foundUser = this.users().find(u => u.studentId === studentId.trim());
-        if (foundUser) {
-            this.currentUser.set(foundUser);
-            this.loginError.set(null);
-        } else {
-            this.loginError.set("No user found with this Student ID. Please contact an admin.");
-            this.currentUser.set(null);
-        }
-    }
-
-    logout() {
-        this.currentUser.set(null);
-        this.currentPage.set('dashboard');
-    }
-
-    // --- CRUD OPERATIONS ---
     private showNotification(message: string, type: 'success' | 'error') {
         this.notification.set({ message, type });
         setTimeout(() => this.notification.set(null), 3000);
     }
-    
-    // Item Modal
-    openItemModal(item?: EquipmentItem) {
-        if (item) {
-            this.editingItem.set(item);
-            this.itemForm = { ...item };
-        } else {
-            this.editingItem.set(null);
-            this.itemForm = { id: 0, name: '', category: '', stock: 0, location: '', status: 'Available' };
-        }
-        this.isItemModalOpen.set(true);
-    }
 
-    async saveItem() {
-        if (!this.itemForm.name || !this.itemForm.category) return;
-        try {
-            if (this.editingItem()) {
-                const updatedItem = await firstValueFrom(this.http.put<EquipmentItem>(`${this.apiBaseUrl}/items/${this.editingItem()!.id}`, this.itemForm));
-                this.items.update(items => items.map(i => i.id === updatedItem.id ? updatedItem : i));
-                this.showNotification('Item updated successfully.', 'success');
-            } else {
-                const newItem = await firstValueFrom(this.http.post<EquipmentItem>(`${this.apiBaseUrl}/items`, this.itemForm));
-                this.items.update(items => [...items, newItem]);
-                this.showNotification('Item added successfully.', 'success');
-            }
-        } catch (e) {
-            console.error("Error saving item: ", e);
-            this.showNotification('Failed to save item.', 'error');
-        } finally {
-            this.isItemModalOpen.set(false);
+    private handleApiError(error: any, defaultMessage: string) {
+        let errorMessage = defaultMessage;
+        if (error instanceof HttpErrorResponse && error.error?.error) {
+            errorMessage = error.error.error;
         }
-    }
-
-    async deleteItem(id: number) {
-        try {
-            await firstValueFrom(this.http.delete(`${this.apiBaseUrl}/items/${id}`));
-            this.items.update(items => items.filter(i => i.id !== id));
-            this.showNotification('Item deleted successfully.', 'success');
-        } catch (e) {
-            console.error("Error deleting item:", e);
-            this.showNotification('Failed to delete item.', 'error');
-        }
-    }
-
-    // User Modal
-    openUserModal(user?: LendifyUser) {
-        if (user) {
-            this.editingUser.set(user);
-            this.userForm = { ...user };
-        } else {
-            this.editingUser.set(null);
-            this.userForm = { id: 0, name: '', studentId: '', email: '' };
-        }
-        this.isUserModalOpen.set(true);
-    }
-
-    async saveUser() {
-        if (!this.userForm.name || !this.userForm.studentId || !this.userForm.email) return;
-        try {
-            if (this.editingUser()) {
-                const updatedUser = await firstValueFrom(this.http.put<LendifyUser>(`${this.apiBaseUrl}/users/${this.editingUser()!.id}`, this.userForm));
-                this.users.update(users => users.map(u => u.id === updatedUser.id ? updatedUser : u));
-                this.showNotification('User updated successfully.', 'success');
-            } else {
-                const newUser = await firstValueFrom(this.http.post<LendifyUser>(`${this.apiBaseUrl}/users`, this.userForm));
-                this.users.update(users => [...users, newUser]);
-                this.showNotification('User added successfully.', 'success');
-            }
-        } catch(e) {
-            console.error("Error saving user:", e);
-            this.showNotification('Failed to save user.', 'error');
-        } finally {
-            this.isUserModalOpen.set(false);
-        }
-    }
-
-    async deleteUser(id: number) {
-         try {
-            await firstValueFrom(this.http.delete(`${this.apiBaseUrl}/users/${id}`));
-            this.users.update(users => users.filter(u => u.id !== id));
-            this.showNotification('User deleted successfully.', 'success');
-         } catch(e) {
-            console.error("Error deleting user:", e);
-            this.showNotification('Failed to delete user.', 'error');
-         }
-    }
-
-    // --- LENDING LOGIC ---
-    async borrowItem(item: EquipmentItem) {
-        if (!this.currentUser()) {
-            this.showNotification("Error: No user is logged in.", 'error');
-            return;
-        }
-        try {
-            await firstValueFrom(this.http.post(`${this.apiBaseUrl}/borrow`, { userId: this.currentUser()!.id, itemId: item.id }));
-            this.showNotification(`You have successfully borrowed: ${item.name}`, 'success');
-            this.fetchAllData(); // Refresh all data to reflect changes
-        } catch (e) {
-            console.error("Error borrowing item:", e);
-            this.showNotification("An error occurred. Could not borrow item.", 'error');
-        }
-    }
-
-    async returnItem(record: BorrowRecord) {
-        try {
-            await firstValueFrom(this.http.put(`${this.apiBaseUrl}/return/${record.id}`, {}));
-            this.showNotification(`${record.itemName} has been successfully returned.`, 'success');
-            this.fetchAllData(); // Refresh all data to reflect changes
-        } catch (e) {
-            console.error("Error returning item:", e);
-            this.showNotification("An error occurred. Could not return item.", 'error');
-        }
+        this.authError.set(errorMessage); // Use authError for login/register
+        this.showNotification(errorMessage, 'error'); // And notification for other errors
+        console.error("API Error:", error);
     }
 }
 
