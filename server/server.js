@@ -2,12 +2,11 @@
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
-const bcrypt = require('bcrypt');
+// bcrypt is no longer used for this prototype version
 
 // --- CONFIGURATION ---
 const app = express();
 const port = 3000;
-const saltRounds = 10;
 
 const dbConfig = {
   host: 'localhost',
@@ -28,9 +27,9 @@ const pool = mysql.createPool(dbConfig);
 
 // --- API ROUTES ---
 
-// Test route to confirm the server is running
+// Test route to confirm server is running
 app.get('/', (req, res) => {
-  res.status(200).send('Lendify API Server is running and ready!');
+  res.status(200).send('Lendify API Server is running (Plain Text Password Mode)!');
 });
 
 // === AUTHENTICATION API ===
@@ -39,10 +38,10 @@ app.post('/api/register', async (req, res) => {
     if (!name || !studentId || !email || !password) {
         return res.status(400).json({ error: 'All fields are required.' });
     }
+    // No hashing, just save the password directly as plain text
     try {
-        const hashedPassword = await bcrypt.hash(password, saltRounds);
         const query = 'INSERT INTO users (name, studentId, email, password) VALUES (?, ?, ?, ?)';
-        const [results] = await pool.query(query, [name, studentId, email, hashedPassword]);
+        const [results] = await pool.query(query, [name, studentId, email, password]);
         res.status(201).json({ id: results.insertId, name, studentId, email, role: 'student' });
     } catch (error) {
         if (error.code === 'ER_DUP_ENTRY') {
@@ -55,17 +54,18 @@ app.post('/api/register', async (req, res) => {
 });
 
 app.post('/api/login', async (req, res) => {
-    const { studentId, password } = req.body;
-    if (!studentId || !password) {
+    const { studentId, password: plainTextPassword } = req.body;
+    if (!studentId || !plainTextPassword) {
         return res.status(400).json({ error: 'Student ID and password are required.' });
     }
     try {
         const [users] = await pool.query('SELECT * FROM users WHERE studentId = ?', [studentId]);
         if (users.length > 0) {
             const user = users[0];
-            const passwordMatch = await bcrypt.compare(password, user.password);
-            if (passwordMatch) {
-                const { password, ...userWithoutPassword } = user;
+            
+            // --- Simple text comparison instead of bcrypt ---
+            if (user.password === plainTextPassword) {
+                const { password, ...userWithoutPassword } = user; // Still don't send password to frontend
                 res.json(userWithoutPassword);
             } else {
                 res.status(401).json({ error: 'Invalid credentials.' });
@@ -75,32 +75,22 @@ app.post('/api/login', async (req, res) => {
         }
     } catch (error) {
         console.error("Login error:", error);
-        res.status(500).json({ error: 'A server error occurred during login.' });
+        res.status(500).json({ error: 'A server error occurred.' });
     }
 });
 
 // === ITEMS API ===
 app.get('/api/items', async (req, res) => {
-    try {
-        const [results] = await pool.query('SELECT * FROM items ORDER BY name ASC');
-        res.json(results);
-    } catch (error) {
-        console.error("Get items error:", error);
-        res.status(500).json({ error: 'Failed to retrieve items.' });
-    }
+    const [results] = await pool.query('SELECT * FROM items ORDER BY name ASC');
+    res.json(results);
 });
 
 app.post('/api/items', async (req, res) => {
     const { name, category, stock, location } = req.body;
     const status = Number(stock) > 0 ? 'Available' : 'Out of Stock';
     const query = 'INSERT INTO items (name, category, stock, location, status) VALUES (?, ?, ?, ?, ?)';
-    try {
-        const [results] = await pool.query(query, [name, category, stock, location, status]);
-        res.status(201).json({ id: results.insertId, ...req.body, status });
-    } catch (error) {
-        console.error("Create item error:", error);
-        res.status(500).json({ error: 'Failed to create item.' });
-    }
+    const [results] = await pool.query(query, [name, category, stock, location, status]);
+    res.status(201).json({ id: results.insertId, ...req.body, status });
 });
 
 app.put('/api/items/:id', async (req, res) => {
@@ -108,56 +98,40 @@ app.put('/api/items/:id', async (req, res) => {
     const { name, category, stock, location } = req.body;
     const status = Number(stock) > 0 ? 'Available' : 'Out of Stock';
     const query = 'UPDATE items SET name = ?, category = ?, stock = ?, location = ?, status = ? WHERE id = ?';
-    try {
-        const [results] = await pool.query(query, [name, category, stock, location, status, id]);
-        if (results.affectedRows > 0) {
-            res.json({ id: parseInt(id, 10), ...req.body, status });
-        } else {
-            res.status(404).json({ error: 'Item not found' });
-        }
-    } catch (error) {
-        console.error("Update item error:", error);
-        res.status(500).json({ error: 'Failed to update item.' });
+    const [results] = await pool.query(query, [name, category, stock, location, status, id]);
+     if (results.affectedRows > 0) {
+        res.json({ id: parseInt(id, 10), name, category, stock, location, status });
+    } else {
+        res.status(404).json({ error: 'Item not found' });
     }
 });
 
 app.delete('/api/items/:id', async (req, res) => {
     const { id } = req.params;
-    try {
-        const [results] = await pool.query('DELETE FROM items WHERE id = ?', [id]);
-        if (results.affectedRows > 0) {
-            res.status(204).send();
-        } else {
-            res.status(404).json({ error: 'Item not found' });
-        }
-    } catch (error) {
-        console.error("Delete item error:", error);
-        res.status(500).json({ error: 'Failed to delete item.' });
+    const [results] = await pool.query('DELETE FROM items WHERE id = ?', [id]);
+     if (results.affectedRows > 0) {
+        res.status(204).send();
+    } else {
+        res.status(404).json({ error: 'Item not found' });
     }
 });
 
+
 // === USERS API ===
 app.get('/api/users', async (req, res) => {
-    const query = "SELECT id, name, studentId, email, role, createdAt FROM users ORDER BY name ASC";
-    try {
-        const [results] = await pool.query(query);
-        res.json(results);
-    } catch (error) {
-        console.error("Get users error:", error);
-        res.status(500).json({ error: 'Failed to retrieve users.' });
-    }
+    const [results] = await pool.query("SELECT id, name, studentId, email, role, createdAt FROM users ORDER BY name ASC");
+    res.json(results);
 });
 
 app.post('/api/users', async (req, res) => {
     const { name, studentId, email, role } = req.body;
-    const defaultPassword = 'password123';
+    const defaultPassword = 'password123'; // Admin creates user with a plain text default password
+    const query = 'INSERT INTO users (name, studentId, email, password, role) VALUES (?, ?, ?, ?, ?)';
     try {
-        const hashedPassword = await bcrypt.hash(defaultPassword, saltRounds);
-        const query = 'INSERT INTO users (name, studentId, email, password, role) VALUES (?, ?, ?, ?, ?)';
-        const [results] = await pool.query(query, [name, studentId, email, hashedPassword, role || 'student']);
+        const [results] = await pool.query(query, [name, studentId, email, defaultPassword, role || 'student']);
         res.status(201).json({ id: results.insertId, name, studentId, email, role: role || 'student' });
     } catch (error) {
-        if (error.code === 'ER_DUP_ENTRY') {
+         if (error.code === 'ER_DUP_ENTRY') {
             res.status(409).json({ error: 'Student ID or email already exists.' });
         } else {
             console.error("Admin user creation error:", error);
@@ -170,31 +144,21 @@ app.put('/api/users/:id', async (req, res) => {
     const { id } = req.params;
     const { name, studentId, email, role } = req.body;
     const query = 'UPDATE users SET name = ?, studentId = ?, email = ?, role = ? WHERE id = ?';
-    try {
-        const [results] = await pool.query(query, [name, studentId, email, role, id]);
-        if (results.affectedRows > 0) {
-            res.json({ id: parseInt(id, 10), name, studentId, email, role });
-        } else {
-            res.status(404).json({ error: 'User not found' });
-        }
-    } catch (error) {
-        console.error("Update user error:", error);
-        res.status(500).json({ error: 'Failed to update user.' });
+    const [results] = await pool.query(query, [name, studentId, email, role, id]);
+     if (results.affectedRows > 0) {
+        res.json({ id: parseInt(id, 10), name, studentId, email, role });
+    } else {
+        res.status(404).json({ error: 'User not found' });
     }
 });
 
 app.delete('/api/users/:id', async (req, res) => {
     const { id } = req.params;
-    try {
-        const [results] = await pool.query('DELETE FROM users WHERE id = ?', [id]);
-        if (results.affectedRows > 0) {
-            res.status(204).send();
-        } else {
-            res.status(404).json({ error: 'User not found' });
-        }
-    } catch (error) {
-        console.error("Delete user error:", error);
-        res.status(500).json({ error: 'Failed to delete user.' });
+    const [results] = await pool.query('DELETE FROM users WHERE id = ?', [id]);
+    if (results.affectedRows > 0) {
+        res.status(204).send();
+    } else {
+        res.status(404).json({ error: 'User not found' });
     }
 });
 
@@ -207,13 +171,8 @@ app.get('/api/borrow_records', async (req, res) => {
         JOIN items i ON br.itemId = i.id
         ORDER BY br.borrowedDate DESC
     `;
-    try {
-        const [results] = await pool.query(query);
-        res.json(results);
-    } catch (error) {
-        console.error("Get borrow records error:", error);
-        res.status(500).json({ error: 'Failed to retrieve borrow records.' });
-    }
+    const [results] = await pool.query(query);
+    res.json(results);
 });
 
 app.post('/api/borrow', async (req, res) => {

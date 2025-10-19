@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, signal, WritableSignal, OnInit, inject } from '@angular/core';
-import { CommonModule, formatDate } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpClientModule, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
