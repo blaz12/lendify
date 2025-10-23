@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, DatePipe } from '@angular/common'; // Import DatePipe
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../services/api.service';
 import { LendifyUser } from '../models';
@@ -7,28 +7,21 @@ import { LendifyUser } from '../models';
 @Component({
   selector: 'app-user-list',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, DatePipe], // Add DatePipe
   templateUrl: './user-list.component.html',
   styleUrl: './user-list.component.scss'
 })
 export class UserListComponent implements OnInit {
   private apiService = inject(ApiService);
 
-  // Signal to hold our list of users
   users = signal<LendifyUser[]>([]);
   isLoading = signal<boolean>(true);
+  viewMode = signal<'active' | 'deleted'>('active'); // State to toggle view
 
-  // State for the modal
   isModalOpen = signal<boolean>(false);
   isEditing = signal<boolean>(false);
-
-  // A signal to hold the user currently being edited or created
   currentUserForm = signal<LendifyUser>({
-    id: 0,
-    name: '',
-    studentId: '',
-    email: '',
-    role: 'student'
+        id: 0, name: '', studentId: '', email: '', role: 'student'
   });
 
   async ngOnInit() {
@@ -37,34 +30,36 @@ export class UserListComponent implements OnInit {
 
   async loadUsers() {
     this.isLoading.set(true);
+    this.users.set([]); // Clear previous users
     try {
-      const usersData = await this.apiService.getUsers();
+      let usersData;
+      if (this.viewMode() === 'active') {
+        usersData = await this.apiService.getUsers();
+      } else {
+        usersData = await this.apiService.getDeletedUsers();
+      }
       this.users.set(usersData);
     } catch (error) {
       console.error("Error loading users:", error);
-      // Add user notification later
+      alert("Failed to load users."); // Replace alert
     } finally {
       this.isLoading.set(false);
     }
   }
 
-  // --- Modal and Form Handling ---
+  toggleViewMode() {
+    this.viewMode.update(mode => mode === 'active' ? 'deleted' : 'active');
+    this.loadUsers(); // Reload users based on the new mode
+  }
 
+  // --- Modal and Form Handling ---
   openModal(userToEdit?: LendifyUser) {
     if (userToEdit) {
       this.isEditing.set(true);
-      // Set currentUserForm to a *copy* of the user to edit
       this.currentUserForm.set({ ...userToEdit });
     } else {
       this.isEditing.set(false);
-      // Reset the form
-      this.currentUserForm.set({
-        id: 0,
-        name: '',
-        studentId: '',
-        email: '',
-        role: 'student'
-      });
+      this.resetCurrentUserForm();
     }
     this.isModalOpen.set(true);
   }
@@ -73,17 +68,11 @@ export class UserListComponent implements OnInit {
     this.isModalOpen.set(false);
   }
 
-  // Method to safely update fields in the form signal
   updateCurrentUserForm(field: keyof LendifyUser, value: any) {
     this.currentUserForm.update(current => {
-      // Ensure we don't accidentally modify the original object
       const updatedUser = { ...current };
-
-      // Update the specified field
-      // We use 'as any' here because TypeScript might complain about assigning
-      // a generic string/number to specific fields like 'role'.
+      // Use 'as any' for simplicity, or add specific type checks
       (updatedUser as any)[field] = value;
-
       return updatedUser;
     });
   }
@@ -104,9 +93,7 @@ export class UserListComponent implements OnInit {
         );
         alert("User updated successfully."); // Replace alert
       } else {
-        // When creating, we don't send the ID.
-        // The backend assigns a default password ('password123')
-        const { id, ...newUserData } = userData;
+        const { id, createdAt, deletedAt, ...newUserData } = userData; // Exclude properties not needed for creation
         const createdUser = await this.apiService.createUser(newUserData);
         this.users.update(users => [...users, createdUser]);
         alert('User added successfully. Default password is "password123".'); // Replace alert
@@ -119,18 +106,41 @@ export class UserListComponent implements OnInit {
     }
   }
 
-  async deleteUser(user: LendifyUser) {
+  async deleteUser(user: LendifyUser) { // Performs SOFT delete
     if (!confirm(`Are you sure you want to delete user "${user.name}" (${user.studentId})?`)) { // Replace confirm
       return;
     }
-
     try {
       await this.apiService.deleteUser(user.id);
+      // Remove from the current view immediately
       this.users.update(users => users.filter(u => u.id !== user.id));
-      alert("User deleted successfully."); // Replace alert
+      alert("User deleted successfully (soft delete)."); // Replace alert
     } catch (error) {
       console.error("Error deleting user:", error);
       alert("Failed to delete user."); // Replace alert
     }
   }
+
+  async recoverUser(user: LendifyUser) { // Recovers a user
+     if (!confirm(`Are you sure you want to recover user "${user.name}" (${user.studentId})?`)) { // Replace confirm
+      return;
+    }
+    try {
+      await this.apiService.recoverUser(user.id);
+       // Remove from the 'deleted' view immediately
+      this.users.update(users => users.filter(u => u.id !== user.id));
+      alert("User recovered successfully."); // Replace alert
+    } catch (error) {
+       console.error("Error recovering user:", error);
+       alert("Failed to recover user."); // Replace alert
+    }
+  }
+
+  // Helper to reset form
+  private resetCurrentUserForm() {
+     this.currentUserForm.set({
+        id: 0, name: '', studentId: '', email: '', role: 'student'
+      });
+  }
 }
+

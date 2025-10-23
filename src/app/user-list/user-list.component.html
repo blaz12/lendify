@@ -1,8 +1,19 @@
 <div class="flex justify-between items-center mb-6">
-  <h2 class="text-3xl font-bold text-slate-800">Manage Users</h2>
-  <button (click)="openModal()" class="px-4 py-2 font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
-    Add New User
-  </button>
+  <h2 class="text-3xl font-bold text-slate-800">
+    Manage {{ viewMode() === 'active' ? 'Active' : 'Deleted' }} Users
+  </h2>
+  <div>
+    <!-- Toggle Button -->
+    <button (click)="toggleViewMode()" class="mr-4 px-4 py-2 font-semibold text-sm text-indigo-600 bg-indigo-100 rounded-lg hover:bg-indigo-200">
+      Show {{ viewMode() === 'active' ? 'Deleted' : 'Active' }} Users
+    </button>
+    <!-- Add Button (only when viewing active users) -->
+    @if (viewMode() === 'active') {
+      <button (click)="openModal()" class="px-4 py-2 font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
+        Add New User
+      </button>
+    }
+  </div>
 </div>
 
 @if (isLoading()) {
@@ -18,6 +29,9 @@
           <th scope="col" class="px-6 py-3">Student ID</th>
           <th scope="col" class="px-6 py-3">Email</th>
           <th scope="col" class="px-6 py-3">Role</th>
+          @if (viewMode() === 'deleted') {
+            <th scope="col" class="px-6 py-3">Deleted On</th>
+          }
           <th scope="col" class="px-6 py-3">Actions</th>
         </tr>
       </thead>
@@ -28,78 +42,84 @@
             <td class="px-6 py-4">{{ user.studentId }}</td>
             <td class="px-6 py-4">{{ user.email }}</td>
             <td class="px-6 py-4 capitalize">{{ user.role }}</td>
+             @if (viewMode() === 'deleted') {
+               <!-- Use DatePipe to format the deletedAt timestamp -->
+               <td class="px-6 py-4">{{ user.deletedAt | date:'short' }}</td>
+             }
             <td class="px-6 py-4 flex space-x-2">
-              <button (click)="openModal(user)" class="text-indigo-600 hover:text-indigo-900">Edit</button>
-              <button (click)="deleteUser(user)" class="text-red-600 hover:text-red-900">Delete</button>
+              @if (viewMode() === 'active') {
+                <button (click)="openModal(user)" class="text-indigo-600 hover:text-indigo-900">Edit</button>
+                <button (click)="deleteUser(user)" class="text-red-600 hover:text-red-900">Delete</button>
+              } @else {
+                 <button (click)="recoverUser(user)" class="text-green-600 hover:text-green-900">Recover</button>
+              }
             </td>
           </tr>
         }
       </tbody>
     </table>
     @if (users().length === 0) {
-      <p class="text-center py-8 text-gray-500">No users found. Add a user to get started.</p>
+      <p class="text-center py-8 text-gray-500">No {{ viewMode() }} users found.</p>
     }
   </div>
 }
 
-<!-- Add/Edit User Modal -->
-@if (isModalOpen()) {
+<!-- Add/Edit User Modal (Only shown/used when viewing active users) -->
+@if (isModalOpen() && viewMode() === 'active') {
   <div class="modal-backdrop">
     <div class="modal-content w-full max-w-lg p-8 space-y-4 bg-white rounded-xl shadow-lg">
-      <h3 class="text-2xl font-bold">{{ isEditing() ? 'Edit' : 'Add' }} User</h3>
-
-      <!-- User Form -->
-      <div>
-        <label class="text-sm font-medium text-gray-700">Full Name</label>
-        <input 
-          type="text" 
-          [ngModel]="currentUserForm().name"
-          (ngModelChange)="updateCurrentUserForm('name', $event)"
-          [ngModelOptions]="{ standalone: true }"
-          class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" 
-          placeholder="e.g., John Doe">
-      </div>
-       <div>
-        <label class="text-sm font-medium text-gray-700">Student ID</label>
-        <input 
-          type="text" 
-          [ngModel]="currentUserForm().studentId"
-          (ngModelChange)="updateCurrentUserForm('studentId', $event)"
-          [ngModelOptions]="{ standalone: true }"
-          class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" 
-          placeholder="e.g., 12345678">
-      </div>
-       <div>
-        <label class="text-sm font-medium text-gray-700">Email</label>
-        <input 
-          type="email" 
-          [ngModel]="currentUserForm().email"
-          (ngModelChange)="updateCurrentUserForm('email', $event)"
-          [ngModelOptions]="{ standalone: true }"
-          class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" 
-          placeholder="e.g., john.doe@university.edu">
-      </div>
-       <div>
-        <label class="text-sm font-medium text-gray-700">Role</label>
-        <select 
-          [ngModel]="currentUserForm().role"
-          (ngModelChange)="updateCurrentUserForm('role', $event)"
-          [ngModelOptions]="{ standalone: true }"
-          class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-            <option value="student">Student</option>
-            <option value="admin">Admin</option>
-        </select>
-      </div>
-
-       @if (!isEditing()) {
-          <p class="text-sm text-gray-500 italic">A default password ('password123') will be assigned. The user should change it after logging in.</p>
-       }
-
-      <!-- Modal Actions -->
-      <div class="flex justify-end space-x-4 pt-4">
-        <button (click)="closeModal()" class="px-4 py-2 font-semibold text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
-        <button (click)="saveUser()" class="px-4 py-2 font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">Save User</button>
-      </div>
+       <h3 class="text-2xl font-bold">{{ isEditing() ? 'Edit' : 'Add' }} User</h3>
+        <!-- User Form -->
+        <div>
+            <label class="text-sm font-medium text-gray-700">Full Name</label>
+            <input
+              type="text"
+              [ngModel]="currentUserForm().name"
+              (ngModelChange)="updateCurrentUserForm('name', $event)"
+              [ngModelOptions]="{ standalone: true }"
+              class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="e.g., John Doe">
+        </div>
+        <div>
+            <label class="text-sm font-medium text-gray-700">Student ID</label>
+            <input
+              type="text"
+              [ngModel]="currentUserForm().studentId"
+              (ngModelChange)="updateCurrentUserForm('studentId', $event)"
+              [ngModelOptions]="{ standalone: true }"
+              class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="e.g., 12345678">
+        </div>
+        <div>
+            <label class="text-sm font-medium text-gray-700">Email</label>
+            <input
+              type="email"
+              [ngModel]="currentUserForm().email"
+              (ngModelChange)="updateCurrentUserForm('email', $event)"
+              [ngModelOptions]="{ standalone: true }"
+              class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="e.g., john.doe@university.edu">
+        </div>
+        <div>
+            <label class="text-sm font-medium text-gray-700">Role</label>
+            <select
+              [ngModel]="currentUserForm().role"
+              (ngModelChange)="updateCurrentUserForm('role', $event)"
+              [ngModelOptions]="{ standalone: true }"
+              class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="student">Student</option>
+                <option value="admin">Admin</option>
+            </select>
+        </div>
+        @if (!isEditing()) {
+            <p class="text-sm text-gray-500 italic">A default password ('password123') will be assigned. The user should change it after logging in.</p>
+        }
+        <!-- Modal Actions -->
+        <div class="flex justify-end space-x-4 pt-4">
+            <button (click)="closeModal()" class="px-4 py-2 font-semibold text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>
+            <button (click)="saveUser()" class="px-4 py-2 font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">Save User</button>
+        </div>
     </div>
   </div>
 }
+

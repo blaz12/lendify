@@ -4,7 +4,8 @@ export interface LendifyUser {
     studentId: string;
     email: string;
     role: 'admin' | 'student';
-    createdAt?: string;
+    createdAt?: string; // Optional property from the database
+    deletedAt?: string | null; // <-- ADD THIS LINE (optional, can be string or null)
 }
 
 export interface EquipmentItem {
@@ -27,4 +28,6 @@ export interface BorrowRecord {
     status: 'Borrowed' | 'Returned';
 }
 
-export type Page = 'dashboard' | 'items' | 'borrow' | 'return' | 'users';
+// You might also want this type if you use it in app.component.ts
+export type Page = 'dashboard' | 'items' | 'borrow-return' | 'users';
+
