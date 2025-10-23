@@ -1,0 +1,62 @@
+@if (isLoading()) {
+  <div class="flex justify-center items-center h-64">
+    <p class="text-lg font-semibold text-slate-500">Loading Borrow/Return Data...</p>
+  </div>
+} @else {
+  <div>
+    <!-- Section 1: Available Items to Borrow -->
+    <h2 class="text-3xl font-bold mb-6 text-slate-800">Borrow Equipment</h2>
+    @if (availableItems().length > 0) {
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
+        @for (item of availableItems(); track item.id) {
+          <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col border border-gray-200">
+            <h3 class="font-bold text-lg text-slate-700">{{ item.name }}</h3>
+            <p class="text-sm text-gray-500">{{ item.category }}</p>
+            <div class="mt-4 flex-grow space-y-1">
+              <p class="text-sm"><span class="font-semibold text-gray-600">Location:</span> {{ item.location }}</p>
+              <p class="text-sm"><span class="font-semibold text-gray-600">In Stock:</span> {{ item.stock }}</p>
+            </div>
+            <button (click)="borrow(item)" class="w-full mt-4 px-4 py-2 font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors">
+              Borrow
+            </button>
+          </div>
+        }
+      </div>
+    } @else {
+      <p class="text-center text-gray-500 mb-12 bg-gray-100 p-4 rounded-lg">No items are currently available to borrow.</p>
+    }
+
+    <!-- Section 2: Items Currently Borrowed by User -->
+    <h2 class="text-3xl font-bold mb-6 text-slate-800 border-t pt-8 mt-8">Return Equipment</h2>
+    <p class="mb-6 text-gray-600">Here are the items you are currently borrowing. Click 'Return' to complete the process.</p>
+    @if (userBorrowedItems().length > 0) {
+      <div class="bg-white rounded-xl shadow-lg overflow-x-auto border border-gray-200">
+        <table class="w-full text-sm text-left text-gray-500">
+          <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+            <tr>
+              <th scope="col" class="px-6 py-3">Item Name</th>
+              <th scope="col" class="px-6 py-3">Borrowed Date</th>
+              <th scope="col" class="px-6 py-3">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (record of userBorrowedItems(); track record.id) {
+              <tr class="bg-white border-b hover:bg-gray-50">
+                <td class="px-6 py-4 font-medium text-gray-900">{{ record.itemName }}</td>
+                <!-- Use the DatePipe to format the date -->
+                <td class="px-6 py-4">{{ record.borrowedDate | date:'medium' }}</td>
+                <td class="px-6 py-4">
+                  <button (click)="return(record.id)" class="px-4 py-2 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
+                    Return
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="text-center text-gray-500 bg-gray-100 p-4 rounded-lg">You are not currently borrowing any items.</p>
+    }
+  </div>
+}

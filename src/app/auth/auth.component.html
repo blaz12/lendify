@@ -1,0 +1,67 @@
+<div class="flex items-center justify-center h-full">
+  <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-xl shadow-lg">
+    
+    <!-- Login Form -->
+    @if(authView() === 'login') {
+      <h2 class="text-3xl font-bold text-center text-gray-800">Welcome Back</h2>
+      <p class="text-center text-gray-500">Sign in to continue</p>
+      
+      <div>
+        <label for="studentId" class="text-sm font-medium text-gray-700">Student ID</label>
+        <input #loginId type="text" id="studentId"
+               class="w-full px-4 py-2 mt-2 text-base text-gray-700 bg-gray-100 border rounded-lg focus:outline-none"
+               placeholder="e.g., 12345678"
+               (keyup.enter)="login(loginId.value, loginPass.value)">
+      </div>
+      <div>
+        <label for="password" class="text-sm font-medium text-gray-700">Password</label>
+        <input #loginPass type="password" id="password" (keyup.enter)="login(loginId.value, loginPass.value)"
+               class="w-full px-4 py-2 mt-2 text-base text-gray-700 bg-gray-100 border rounded-lg focus:outline-none"
+               placeholder="••••••••">
+      </div>
+
+      <button (click)="login(loginId.value, loginPass.value)"
+              class="w-full px-4 py-2 font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
+        Login
+      </button>
+      <p class="text-center text-sm">Don't have an account? 
+        <a (click)="authView.set('register')" class="font-medium text-indigo-600 hover:underline cursor-pointer">Register here</a>
+      </p>
+    } 
+    <!-- Registration Form -->
+    @else {
+      <h2 class="text-3xl font-bold text-center text-gray-800">Create Account</h2>
+      <p class="text-center text-gray-500">Get started with Lendify</p>
+
+      <div>
+        <label class="text-sm font-medium">Full Name</label>
+        <input #regName type="text" class="w-full px-4 py-2 mt-1 bg-gray-100 border rounded-lg" placeholder="e.g., Jane Doe">
+      </div>
+      <div>
+        <label class="text-sm font-medium">Student ID</label>
+        <input #regId type="text" class="w-full px-4 py-2 mt-1 bg-gray-100 border rounded-lg" placeholder="e.g., 87654321">
+      </div>
+      <div>
+        <label class="text-sm font-medium">Email</label>
+        <input #regEmail type="email" class="w-full px-4 py-2 mt-1 bg-gray-100 border rounded-lg" placeholder="e.g., jane.doe@university.edu">
+      </div>
+      <div>
+        <label class="text-sm font-medium">Password</label>
+        <input #regPass type="password" class="w-full px-4 py-2 mt-1 bg-gray-100 border rounded-lg" placeholder="••••••••">
+      </div>
+
+      <button (click)="register(regName.value, regId.value, regEmail.value, regPass.value)"
+              class="w-full px-4 py-2 font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
+        Register
+      </button>
+      <p class="text-center text-sm">Already have an account? 
+        <a (click)="authView.set('login')" class="font-medium text-indigo-600 hover:underline cursor-pointer">Login here</a>
+      </p>
+    }
+    
+    <!-- Error Message -->
+    @if(authError()) {
+      <p class="text-sm text-red-500 text-center p-2 bg-red-50 rounded-md">{{ authError() }}</p>
+    }
+  </div>
+</div>

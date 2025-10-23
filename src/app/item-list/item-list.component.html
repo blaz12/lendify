@@ -1,0 +1,118 @@
+<div class="flex justify-between items-center mb-6">
+  <h2 class="text-3xl font-bold text-slate-800">Manage Items</h2>
+  <button (click)="openModal()" class="px-4 py-2 font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
+    Add New Item
+  </button>
+</div>
+
+<!-- Loading State -->
+@if (isLoading()) {
+  <div class="flex justify-center items-center h-64">
+    <p class="text-lg font-semibold text-slate-500">Loading Items...</p>
+    <!-- Add a spinner or a more visual loading indicator here if desired -->
+  </div>
+} @else {
+  <!-- Items Table -->
+  <div class="bg-white rounded-xl shadow-lg overflow-x-auto">
+    <table class="w-full text-sm text-left text-gray-500">
+      <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+        <tr>
+          <th scope="col" class="px-6 py-3">Name</th>
+          <th scope="col" class="px-6 py-3">Category</th>
+          <th scope="col" class="px-6 py-3">Stock</th>
+          <th scope="col" class="px-6 py-3">Location</th>
+          <th scope="col" class="px-6 py-3">Status</th>
+          <th scope="col" class="px-6 py-3">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (item of items(); track item.id) {
+          <tr class="bg-white border-b hover:bg-gray-50">
+            <td class="px-6 py-4 font-medium text-gray-900">{{ item.name }}</td>
+            <td class="px-6 py-4">{{ item.category }}</td>
+            <td class="px-6 py-4">{{ item.stock }}</td>
+            <td class="px-6 py-4">{{ item.location }}</td>
+            <td class="px-6 py-4">
+              <span [class.bg-green-100]="item.status === 'Available'"
+                    [class.text-green-800]="item.status === 'Available'"
+                    [class.bg-red-100]="item.status === 'Out of Stock'"
+                    [class.text-red-800]="item.status === 'Out of Stock'"
+                    class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full">
+                {{ item.status }}
+              </span>
+            </td>
+            <td class="px-6 py-4 flex space-x-2">
+              <button (click)="openModal(item)" class="text-indigo-600 hover:text-indigo-900">Edit</button>
+              <button (click)="deleteItem(item)" class="text-red-600 hover:text-red-900">Delete</button>
+            </td>
+          </tr>
+        } @empty {
+          <!-- Show this row if the items array is empty -->
+          <tr>
+            <td colspan="6" class="text-center py-8 text-gray-500">
+              No equipment found. Add a new item to get started.
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+}
+
+<!-- Add/Edit Item Modal -->
+@if (isModalOpen()) {
+  <div class="modal-backdrop">
+    <div class="modal-content w-full max-w-lg p-8 space-y-4 bg-white rounded-xl shadow-lg">
+      <h3 class="text-2xl font-bold">{{ isEditing() ? 'Edit' : 'Add' }} Item</h3>
+      
+      <!-- Form Fields -->
+      <div>
+        <label class="text-sm font-medium text-gray-700">Name</label>
+        <input 
+          [ngModel]="currentItem().name" 
+          (ngModelChange)="updateCurrentItem('name', $event)"
+          [ngModelOptions]="{standalone: true}"
+          class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+          type="text" placeholder="e.g., MacBook Pro 14">
+      </div>
+       <div>
+        <label class="text-sm font-medium text-gray-700">Category</label>
+        <input 
+          [ngModel]="currentItem().category" 
+          (ngModelChange)="updateCurrentItem('category', $event)"
+          [ngModelOptions]="{standalone: true}"
+          class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+          type="text" placeholder="e.g., Electronics">
+      </div>
+       <div>
+        <label class="text-sm font-medium text-gray-700">Stock</label>
+        <input 
+          [ngModel]="currentItem().stock" 
+          (ngModelChange)="updateCurrentItem('stock', $event)"
+          [ngModelOptions]="{standalone: true}"
+          class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+          type="number" min="0">
+      </div>
+       <div>
+        <label class="text-sm font-medium text-gray-700">Location</label>
+        <input 
+          [ngModel]="currentItem().location" 
+          (ngModelChange)="updateCurrentItem('location', $event)"
+          [ngModelOptions]="{standalone: true}"
+          class="w-full px-3 py-2 mt-1 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+          type="text" placeholder="e.g., Library Room 201">
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex justify-end space-x-4 pt-4">
+        <button (click)="closeModal()" class="px-4 py-2 font-semibold text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">
+          Cancel
+        </button>
+        <button (click)="saveItem()" class="px-4 py-2 font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700">
+          Save Item
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
