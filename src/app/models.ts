@@ -23,6 +23,7 @@ export interface BorrowRecord {
     userName: string;
     itemId: number;
     itemName: string;
+    studentId: string;
     borrowedDate: string;
     returnedDate: string | null;
     status: 'Borrowed' | 'Returned';

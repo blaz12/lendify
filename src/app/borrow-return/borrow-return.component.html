@@ -4,49 +4,49 @@
   </div>
 } @else {
   <div>
-    <!-- Section 1: Available Items to Borrow -->
-    <h2 class="text-3xl font-bold mb-6 text-slate-800">Borrow Equipment</h2>
-    @if (availableItems().length > 0) {
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
-        @for (item of availableItems(); track item.id) {
-          <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col border border-gray-200">
-            <h3 class="font-bold text-lg text-slate-700">{{ item.name }}</h3>
-            <p class="text-sm text-gray-500">{{ item.category }}</p>
-            <div class="mt-4 flex-grow space-y-1">
-              <p class="text-sm"><span class="font-semibold text-gray-600">Location:</span> {{ item.location }}</p>
-              <p class="text-sm"><span class="font-semibold text-gray-600">In Stock:</span> {{ item.stock }}</p>
-            </div>
-            <button (click)="borrow(item)" class="w-full mt-4 px-4 py-2 font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors">
-              Borrow
-            </button>
-          </div>
-        }
-      </div>
-    } @else {
-      <p class="text-center text-gray-500 mb-12 bg-gray-100 p-4 rounded-lg">No items are currently available to borrow.</p>
-    }
+    <!-- Section 1: Borrow Equipment Button and Modal -->
+    <div class="flex justify-between items-center mb-6">
+       <h2 class="text-3xl font-bold text-slate-800">Borrow Equipment</h2>
+       <!-- Button to open the new modal -->
+       <button (click)="openBorrowModal()" class="px-5 py-2 font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
+         Create New Borrow Request
+       </button>
+    </div>
+    <p class="mb-8 text-gray-600">Click the button above to select items and create a borrow request.</p>
 
-    <!-- Section 2: Items Currently Borrowed by User -->
+    <!-- Section 2: Return Equipment -->
     <h2 class="text-3xl font-bold mb-6 text-slate-800 border-t pt-8 mt-8">Return Equipment</h2>
-    <p class="mb-6 text-gray-600">Here are the items you are currently borrowing. Click 'Return' to complete the process.</p>
+    <p class="mb-6 text-gray-600">Select the items you wish to return and click the button below, or return items individually.</p>
+
     @if (userBorrowedItems().length > 0) {
-      <div class="bg-white rounded-xl shadow-lg overflow-x-auto border border-gray-200">
+      <div class="bg-white rounded-xl shadow-lg overflow-x-auto border border-gray-200 mb-4">
         <table class="w-full text-sm text-left text-gray-500">
           <thead class="text-xs text-gray-700 uppercase bg-gray-50">
             <tr>
+              <th scope="col" class="px-3 py-3 w-12 text-center">Select</th>
               <th scope="col" class="px-6 py-3">Item Name</th>
               <th scope="col" class="px-6 py-3">Borrowed Date</th>
-              <th scope="col" class="px-6 py-3">Action</th>
+              <!-- Action Header -->
+              <th scope="col" class="px-6 py-3 text-center">Action</th>
             </tr>
           </thead>
           <tbody>
             @for (record of userBorrowedItems(); track record.id) {
               <tr class="bg-white border-b hover:bg-gray-50">
+                <!-- Checkbox Column -->
+                <td class="px-3 py-4 w-12 text-center">
+                   <input
+                     type="checkbox"
+                     class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                     [checked]="selectedRecordIds().has(record.id)"
+                     (change)="toggleReturnSelection(record.id, $event)"
+                   >
+                </td>
                 <td class="px-6 py-4 font-medium text-gray-900">{{ record.itemName }}</td>
-                <!-- Use the DatePipe to format the date -->
                 <td class="px-6 py-4">{{ record.borrowedDate | date:'medium' }}</td>
-                <td class="px-6 py-4">
-                  <button (click)="return(record.id)" class="px-4 py-2 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
+                <!-- Single Return Button -->
+                <td class="px-6 py-4 text-center">
+                  <button (click)="returnSingleItem(record.id)" class="px-3 py-1 text-xs font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors">
                     Return
                   </button>
                 </td>
@@ -55,8 +55,111 @@
           </tbody>
         </table>
       </div>
+
+      <!-- Bulk Return Button and Error Display -->
+      <div class="flex justify-end items-center mt-4">
+         @if (returnError()) {
+            <p class="text-sm text-red-600 mr-4">{{ returnError() }}</p>
+         }
+         <button
+           (click)="returnSelectedItems()"
+           [disabled]="!hasSelectedItems() || isLoading()"
+           class="px-5 py-2 font-semibold text-white bg-blue-600 rounded-lg transition-colors"
+           [class.opacity-50]="!hasSelectedItems() || isLoading()"
+           [class.hover:bg-blue-700]="hasSelectedItems() && !isLoading()">
+            Return Selected ({{ selectedRecordIds().size }})
+         </button>
+      </div>
+
     } @else {
       <p class="text-center text-gray-500 bg-gray-100 p-4 rounded-lg">You are not currently borrowing any items.</p>
     }
   </div>
 }
+
+<!-- Borrow Request Modal -->
+@if (isBorrowModalOpen()) {
+  <div class="modal-backdrop">
+    <div class="modal-content w-full max-w-3xl p-8 space-y-6 bg-white rounded-xl shadow-lg">
+      <h3 class="text-2xl font-bold text-slate-800 border-b pb-3 mb-6">Create Borrow Request</h3>
+
+       <!-- Loading state inside modal during submission -->
+       @if(isLoading()) {
+         <div class="flex justify-center items-center py-10">
+           <p class="text-lg font-semibold text-slate-500">Submitting request...</p>
+         </div>
+       } @else {
+         <!-- Form Fields for Usage Context -->
+         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Usage Location</label>
+              <select [(ngModel)]="usageLocation" [ngModelOptions]="{ standalone: true }" class="w-full px-3 py-2 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="" disabled>Select location...</option>
+                  <option value="Class 1">Class 1</option>
+                  <option value="Class 2">Class 2</option>
+                  <option value="Class 3">Class 3</option>
+                  <option value="Auditorium">Auditorium</option>
+                  <option value="Other">Other (Specify below)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Occasion / Purpose</label>
+              <input type="text" [(ngModel)]="occasion" [ngModelOptions]="{ standalone: true }" class="w-full px-3 py-2 bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="e.g., Presentation, Workshop, Event Name">
+            </div>
+         </div>
+
+
+         <!-- Item Selection Table -->
+         <h4 class="text-lg font-semibold text-slate-700 mb-3">Select Items to Borrow</h4>
+         <div class="max-h-60 overflow-y-auto border rounded-lg">
+            <table class="w-full text-sm text-left text-gray-500">
+              <thead class="text-xs text-gray-700 uppercase bg-gray-100 sticky top-0">
+                  <tr>
+                    <th scope="col" class="px-4 py-2">Item Name</th>
+                    <th scope="col" class="px-4 py-2">Category</th>
+                    <th scope="col" class="px-4 py-2">Available</th>
+                    <th scope="col" class="px-4 py-2 w-24">Quantity</th>
+                  </tr>
+              </thead>
+              <tbody>
+                  @for (item of borrowRequestItems(); track item.id) {
+                    <tr class="bg-white border-b hover:bg-gray-50">
+                      <td class="px-4 py-2 font-medium text-gray-900">{{ item.name }}</td>
+                      <td class="px-4 py-2">{{ item.category }}</td>
+                      <td class="px-4 py-2">{{ item.stock }}</td>
+                      <td class="px-4 py-2">
+                          <input
+                            type="number"
+                            min="0"
+                            [max]="item.stock"
+                            [ngModel]="borrowQuantities()[item.id] || 0"
+                            (input)="updateQuantity(item.id, $event)"
+                            [ngModelOptions]="{ standalone: true }"
+                            class="w-full px-2 py-1 border border-gray-300 rounded-md text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          >
+                      </td>
+                    </tr>
+                  } @empty {
+                     <tr>
+                        <td colspan="4" class="text-center py-6 text-gray-500">No items available to borrow.</td>
+                     </tr>
+                  }
+              </tbody>
+            </table>
+         </div>
+
+         <!-- Display Borrow Error Message -->
+         @if (borrowError()) {
+            <p class="text-sm text-red-600 bg-red-50 p-3 rounded-md mt-4">{{ borrowError() }}</p>
+         }
+
+         <!-- Modal Actions -->
+         <div class="flex justify-end space-x-4 pt-6 border-t mt-6">
+            <button (click)="closeBorrowModal()" class="px-5 py-2 font-semibold text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors">Cancel</button>
+            <button (click)="submitBorrowRequest()" class="px-5 py-2 font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">Submit Borrow Request</button>
+         </div>
+       } <!-- End else for isLoading -->
+    </div>
+  </div>
+}
+

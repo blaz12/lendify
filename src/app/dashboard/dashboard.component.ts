@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, DatePipe } from '@angular/common'; // Import DatePipe
 import { ApiService } from '../services/api.service';
 import { EquipmentItem, BorrowRecord } from '../models';
 
@@ -8,66 +8,94 @@ interface DashboardStats {
   totalCategories: number;
   totalStock: number;
   totalBorrowed: number;
-  totalItems: number;
-  itemsPerCategory: { category: string, count: number }[];
+  totalItems: number; // For percentage calculation
+  itemsPerCategory: { category: string; count: number }[];
 }
+
+// Type to track which detail section is expanded
+type ExpandedSection = 'categories' | 'inventory' | 'borrowed' | null;
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, DatePipe], // Include DatePipe
   templateUrl: './dashboard.component.html',
-  styleUrl: './dashboard.component.scss'
+  styleUrls: ['./dashboard.component.scss'] // Corrected from styleUrl
 })
 export class DashboardComponent implements OnInit {
   private apiService = inject(ApiService);
 
-  // Signals to hold our raw data
-  private items = signal<EquipmentItem[]>([]);
-  private borrowRecords = signal<BorrowRecord[]>([]);
-
-  // A signal to track the loading state
   isLoading = signal<boolean>(true);
+  // Signals to store the full data lists
+  private allItems = signal<EquipmentItem[]>([]);
+  private allBorrowRecords = signal<BorrowRecord[]>([]);
 
-  // A computed signal that automatically calculates stats whenever the data changes
+  // Signal to track the currently expanded section
+  expandedSection = signal<ExpandedSection>(null);
+
+  // --- Computed Signals ---
+
+  // Basic stats calculation (remains mostly the same)
   stats = computed<DashboardStats>(() => {
-    const allItems = this.items();
-    const categories = [...new Set(allItems.map(i => i.category))];
+    const items = this.allItems();
+    const categories = [...new Set(items.map(i => i.category))];
     const itemsPerCategory = categories.map(cat => ({
       category: cat,
-      count: allItems.filter(i => i.category === cat).length
-    })).sort((a, b) => b.count - a.count); // Sort by count descending
+      count: items.filter(i => i.category === cat).length
+    }));
+    const currentlyBorrowed = this.allBorrowRecords().filter(r => r.status === 'Borrowed').length;
 
     return {
       totalCategories: categories.length,
-      totalStock: allItems.reduce((sum, i) => sum + i.stock, 0),
-      totalBorrowed: this.borrowRecords().filter(r => r.status === 'Borrowed').length,
-      totalItems: allItems.length,
+      totalStock: items.reduce((sum, i) => sum + i.stock, 0),
+      totalBorrowed: currentlyBorrowed,
+      totalItems: items.length,
       itemsPerCategory
     };
   });
 
-  ngOnInit() {
-    this.loadDashboardData();
+  // Filtered list for currently borrowed items (needed for the expanded view)
+  activeBorrowRecords = computed(() => {
+    return this.allBorrowRecords().filter(record => record.status === 'Borrowed');
+  });
+
+  // Get list of unique categories (needed for the expanded view)
+  uniqueCategories = computed(() => {
+    return [...new Set(this.allItems().map(item => item.category))].sort();
+  });
+
+  // Get list of all items currently in stock (needed for the expanded view)
+  inventoryItems = computed(() => {
+     return this.allItems().filter(item => item.stock > 0);
+  });
+
+
+  async ngOnInit() {
+    await this.loadDashboardData();
   }
 
   async loadDashboardData() {
     this.isLoading.set(true);
     try {
-      // Fetch items and records in parallel for faster loading
+      // Fetch all necessary data in parallel
       const [itemsData, recordsData] = await Promise.all([
         this.apiService.getItems(),
-        this.apiService.getBorrowRecords()
+        this.apiService.getBorrowRecords() // Fetch all records
       ]);
-      
-      this.items.set(itemsData);
-      this.borrowRecords.set(recordsData);
-      
+      this.allItems.set(itemsData);
+      this.allBorrowRecords.set(recordsData);
     } catch (error) {
       console.error("Error loading dashboard data:", error);
-      // We'll add a proper notification for the user later
+      alert("Failed to load dashboard data."); // Replace alert later
     } finally {
       this.isLoading.set(false);
     }
   }
+
+  // --- Methods to Toggle Expanded Sections ---
+  toggleSection(section: ExpandedSection) {
+    // If the clicked section is already open, close it. Otherwise, open it.
+    this.expandedSection.update(current => current === section ? null : section);
+  }
 }
+

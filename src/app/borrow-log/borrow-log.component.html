@@ -1,0 +1,37 @@
+<div class="mb-6">
+  <h2 class="text-3xl font-bold text-slate-800">Currently Borrowed Items Log</h2>
+  <p class="text-gray-600 mt-1">This log shows all items currently out on loan.</p>
+</div>
+
+@if (isLoading()) {
+  <div class="flex justify-center items-center h-64">
+    <p class="text-lg font-semibold text-slate-500">Loading Borrow Log...</p>
+  </div>
+} @else {
+  <div class="bg-white rounded-xl shadow-lg overflow-x-auto border border-gray-200">
+    <table class="w-full text-sm text-left text-gray-500">
+      <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+        <tr>
+          <th scope="col" class="px-6 py-3">Item Name</th>
+          <th scope="col" class="px-6 py-3">Borrower Name</th>
+          <th scope="col" class="px-6 py-3">Student ID</th>
+          <th scope="col" class="px-6 py-3">Borrowed Date</th>
+          <!-- Optional: Add a column for due date if you implement that later -->
+        </tr>
+      </thead>
+      <tbody>
+        @for (record of activeBorrowRecords(); track record.id) {
+          <tr class="bg-white border-b hover:bg-gray-50">
+            <td class="px-6 py-4 font-medium text-gray-900">{{ record.itemName }}</td>
+            <td class="px-6 py-4">{{ record.userName }}</td>
+            <td class="px-6 py-4">{{ record.studentId }}</td> <!-- Assuming studentId is on the record from backend -->
+            <td class="px-6 py-4">{{ record.borrowedDate | date:'medium' }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    @if (activeBorrowRecords().length === 0) {
+      <p class="text-center py-8 text-gray-500">No items are currently borrowed.</p>
+    }
+  </div>
+}
