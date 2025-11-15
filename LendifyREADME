@@ -1,6 +1,6 @@
 Lendify – Aplikasi Peminjaman Inventaris Kampus
 
-Dokumentasi ini merupakan README untuk proyek aplikasi Lendify, sesuai dengan Task 6.1. Lendify adalah aplikasi web prototipe untuk manajemen peminjaman inventaris kampus, dengan arsitektur terpisah antara frontend dan backend.
+Dokumentasi ini merupakan README untuk proyek aplikasi Lendify, sesuai dengan Task 6.1. Lendify adalah aplikasi web prototipe untuk manajemen peminjaman inventaris kampus dengan arsitektur terpisah antara frontend dan backend.
 
 1. Deskripsi Sistem
 
@@ -10,7 +10,7 @@ Frontend: Angular
 
 Backend: Node.js (REST API)
 
-Database: MySQL (melalui XAMPP)
+Database: MySQL (menggunakan XAMPP)
 
 Peran dalam Aplikasi
 
@@ -22,52 +22,42 @@ Student (Mahasiswa)
 
 Melihat dan mencari item.
 
-Meminjam item (batch, dengan konteks lokasi dan occasion).
+Meminjam item (batch, lengkap dengan lokasi dan occasion).
 
 Mengembalikan item (batch atau individu).
 
 Admin
-Memiliki seluruh kemampuan Student, ditambah:
 
-CRUD data item.
+Semua kemampuan Student.
 
-CRUD user (termasuk soft delete dan recover).
+Mengelola item (CRUD).
+
+Mengelola user (CRUD, soft delete, recover).
 
 Melihat Borrow Log lengkap.
 
-Akses ke detail tambahan pada Dashboard.
+Mengakses statistik tambahan pada Dashboard.
 
-2. Arsitektur Komponen (Model-View-Controller)
-
-Aplikasi menerapkan pola arsitektur MVC yang disesuaikan untuk Angular dan API backend terpisah.
-
+2. Arsitektur Komponen (MVC)
 Model
 
-MySQL Database (skema tersedia pada database_restore.sql).
+Struktur database MySQL (file database_restore.sql).
 
-Backend Node.js (server.js) berisi logika bisnis dan operasi database.
+Backend Node.js (server.js) yang menangani logika bisnis.
 
-Angular Services:
+Angular services:
 
-auth.service.ts untuk autentikasi.
+auth.service.ts (autentikasi)
 
-api.service.ts untuk komunikasi API.
+api.service.ts (komunikasi API)
 
 View
 
-Semua berkas .html dalam folder komponen Angular seperti:
-
-dashboard.component.html
-
-item-list.component.html
+File HTML dari setiap komponen Angular.
 
 Controller
 
-Semua berkas .ts dalam komponen Angular seperti:
-
-dashboard.component.ts
-
-item-list.component.ts
+File TypeScript pada setiap komponen Angular.
 
 3. Struktur Folder Proyek
 src/app/
@@ -90,14 +80,9 @@ src/app/
 4. Cara Menjalankan Aplikasi
 Prasyarat
 
-Node.js (LTS)
+Install Angular CLI:
 
-Angular CLI
-
-$ npm install -g @angular/cli
-
-
-XAMPP / MySQL
+npm install -g @angular/cli
 
 Langkah 1: Setup Database (MySQL)
 
@@ -105,29 +90,55 @@ Jalankan Apache dan MySQL melalui XAMPP.
 
 Buka phpMyAdmin melalui http://localhost/phpmyadmin.
 
-Buat database bernama lendify_db.
+Buat database dengan nama lendify_db.
 
-Masuk ke database tersebut, buka tab SQL.
+Buka tab SQL di dalam database.
 
-Salin isi file database_restore.sql, kemudian jalankan.
+Paste isi file database_restore.sql, lalu jalankan.
 
 Langkah 2: Menjalankan Backend (Node.js)
-$ cd path/to/project/server
-$ npm install express mysql2 cors
-$ node server.js
+
+Masuk ke folder backend:
+
+cd path/to/project/server
 
 
-Backend akan berjalan di:
+Install dependencies:
+
+npm install express mysql2 cors
+
+
+Jalankan server backend:
+
+node server.js
+
+
+Backend berjalan pada:
 
 http://localhost:3000
 
 Langkah 3: Menjalankan Frontend (Angular)
-$ cd path/to/project/LENDIFY
-$ npm install
-$ npm install zone.js
-$ ng serve
+
+Masuk ke folder frontend:
+
+cd path/to/project/LENDIFY
 
 
-Aplikasi dapat diakses melalui:
+Install dependencies:
+
+npm install
+
+
+Install zone.js (karena project dibuat dengan flag minimal):
+
+npm install zone.js
+
+
+Jalankan frontend:
+
+ng serve
+
+
+Akses aplikasi melalui:
 
 http://localhost:4200
