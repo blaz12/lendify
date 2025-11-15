@@ -1,7 +1,7 @@
 # Lendify – Aplikasi Peminjaman Inventaris Kampus
 
 Lendify adalah aplikasi web prototipe yang membantu kampus mengelola peminjaman inventaris seperti kamera, tripod, laptop, dan perlengkapan multimedia lainnya.  
-Aplikasi ini memiliki fitur login, register, manajemen inventaris, peminjaman, riwayat, serta autentikasi JWT.
+Aplikasi ini memiliki fitur login, register, manajemen inventaris, peminjaman, riwayat.
 
 ---
 
@@ -37,12 +37,10 @@ Aplikasi ini memiliki fitur login, register, manajemen inventaris, peminjaman, r
 **Backend**
 - Node.js  
 - Express.js  
-- JWT  
 - MySQL (mysql2)
 
 **Tools**
 - XAMPP  
-- Postman (opsional)
 
 ---
 
@@ -62,7 +60,6 @@ lendify/
     └── package.json
 ```
 
----
 
 ## Instalasi & Menjalankan Aplikasi
 
@@ -76,7 +73,6 @@ Masuk ke folder project:
 cd lendify
 ```
 
----
 
 ### 2. Setup Database
 
@@ -85,7 +81,6 @@ cd lendify
 3. Buat database baru bernama **lendify_db**  
 4. Import file SQL bila tersedia  
 
----
 
 ### 3. Menjalankan Backend
 
@@ -100,7 +95,7 @@ npm install express mysql2 cors jsonwebtoken bcryptjs
 ```
 
 Jalankan server:
-`````bash
+```bash
 node server.js
 ```
 
@@ -109,7 +104,6 @@ Backend berjalan di:
 http://localhost:3000
 ```
 
----
 
 ### 4. Menjalankan Frontend
 
@@ -138,7 +132,6 @@ Frontend berjalan di:
 http://localhost:4200
 ```
 
----
 
 ##Endpoint Backend
 
@@ -150,4 +143,3 @@ http://localhost:4200
 | POST   | /borrow          | Peminjaman |
 | GET    | /history/:userId | Riwayat peminjaman |
 
----
