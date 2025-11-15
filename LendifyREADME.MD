@@ -1,144 +1,153 @@
-Lendify – Aplikasi Peminjaman Inventaris Kampus
+# Lendify – Aplikasi Peminjaman Inventaris Kampus
 
-Dokumentasi ini merupakan README untuk proyek aplikasi Lendify, sesuai dengan Task 6.1. Lendify adalah aplikasi web prototipe untuk manajemen peminjaman inventaris kampus dengan arsitektur terpisah antara frontend dan backend.
+Lendify adalah aplikasi web prototipe yang membantu kampus mengelola peminjaman inventaris seperti kamera, tripod, laptop, dan perlengkapan multimedia lainnya.  
+Aplikasi ini memiliki fitur login, register, manajemen inventaris, peminjaman, riwayat, serta autentikasi JWT.
 
-1. Deskripsi Sistem
+---
 
-Lendify adalah aplikasi berbasis web yang terdiri dari:
+##Daftar Isi
+- Fitur Utama
+- Teknologi yang Digunakan
+- Struktur Project
+- Instalasi & Menjalankan Aplikasi
+- Endpoint Backend
+- Screenshots
+- License
 
-Frontend: Angular
+---
 
-Backend: Node.js (REST API)
+##Fitur Utama
+- Login & Register (dengan JWT + bcrypt)
+- Daftar inventaris kampus
+- Sistem peminjaman
+- Riwayat peminjaman
+- REST API Express.js
+- Frontend Angular
+- MySQL database
 
-Database: MySQL (menggunakan XAMPP)
+---
 
-Peran dalam Aplikasi
+##Teknologi yang Digunakan
 
-New User
+**Frontend**
+- Angular 16  
+- TypeScript  
+- Bootstrap  
 
-Membuat akun baru.
+**Backend**
+- Node.js  
+- Express.js  
+- JWT  
+- MySQL (mysql2)
 
-Student (Mahasiswa)
+**Tools**
+- XAMPP  
+- Postman (opsional)
 
-Melihat dan mencari item.
+---
 
-Meminjam item (batch, lengkap dengan lokasi dan occasion).
+##Struktur Project
+```
+lendify/
+│
+├── server/                 # Backend (Node.js)
+│   ├── server.js
+│   ├── routes/
+│   ├── controllers/
+│   └── config/
+│
+└── LENDIFY/                # Frontend (Angular)
+    ├── src/
+    ├── angular.json
+    └── package.json
+```
 
-Mengembalikan item (batch atau individu).
+---
 
-Admin
+##Instalasi & Menjalankan Aplikasi
 
-Semua kemampuan Student.
+### 1. Clone Repository
+```bash
+git clone https://github.com/blaz12/lendify.git
+```
 
-Mengelola item (CRUD).
+Masuk ke folder project:
+```bash
+cd lendify
+```
 
-Mengelola user (CRUD, soft delete, recover).
+---
 
-Melihat Borrow Log lengkap.
+### 2. Setup Database
 
-Mengakses statistik tambahan pada Dashboard.
+1. Jalankan Apache + MySQL melalui XAMPP  
+2. Buka phpMyAdmin  
+3. Buat database baru bernama **lendify_db**  
+4. Import file SQL bila tersedia  
 
-2. Arsitektur Komponen (MVC)
-Model
+---
 
-Struktur database MySQL (file database_restore.sql).
+### 3. Menjalankan Backend
 
-Backend Node.js (server.js) yang menangani logika bisnis.
-
-Angular services:
-
-auth.service.ts (autentikasi)
-
-api.service.ts (komunikasi API)
-
-View
-
-File HTML dari setiap komponen Angular.
-
-Controller
-
-File TypeScript pada setiap komponen Angular.
-
-3. Struktur Folder Proyek
-src/app/
-├── auth/                 
-├── borrow-log/           
-├── borrow-return/        
-├── dashboard/            
-├── item-list/            
-├── services/
-│   ├── api.service.ts
-│   └── auth.service.ts
-├── user-list/            
-├── app.component.html
-├── app.component.ts
-├── app.config.ts
-├── app.routes.ts
-├── models.ts
-└── ...
-
-4. Cara Menjalankan Aplikasi
-Prasyarat
-
-Install Angular CLI:
-
-npm install -g @angular/cli
-
-Langkah 1: Setup Database (MySQL)
-
-Jalankan Apache dan MySQL melalui XAMPP.
-
-Buka phpMyAdmin melalui http://localhost/phpmyadmin.
-
-Buat database dengan nama lendify_db.
-
-Buka tab SQL di dalam database.
-
-Paste isi file database_restore.sql, lalu jalankan.
-
-Langkah 2: Menjalankan Backend (Node.js)
-
-Masuk ke folder backend:
-
-cd path/to/project/server
-
+Masuk folder backend:
+```bash
+cd server
+```
 
 Install dependencies:
+```bash
+npm install express mysql2 cors jsonwebtoken bcryptjs
+```
 
-npm install express mysql2 cors
-
-
-Jalankan server backend:
-
+Jalankan server:
+`````bash
 node server.js
+```
 
-
-Backend berjalan pada:
-
+Backend berjalan di:
+```
 http://localhost:3000
+```
 
-Langkah 3: Menjalankan Frontend (Angular)
+---
 
-Masuk ke folder frontend:
+### 4. Menjalankan Frontend
 
-cd path/to/project/LENDIFY
-
+Masuk folder Angular:
+```bash
+cd ../LENDIFY
+```
 
 Install dependencies:
-
+```bash
 npm install
+```
 
+Install Angular CLI jika belum ada:
+```bash
+npm install -g @angular/cli
+```
 
-Install zone.js (karena project dibuat dengan flag minimal):
-
-npm install zone.js
-
-
-Jalankan frontend:
-
+Jalankan aplikasi:
+```bash
 ng serve
+```
 
-
-Akses aplikasi melalui:
-
+Frontend berjalan di:
+```
 http://localhost:4200
+```
+
+---
+
+##Endpoint Backend
+
+| Method | Endpoint        | Deskripsi |
+|--------|------------------|-----------|
+| POST   | /register        | Registrasi user |
+| POST   | /login           | Login + JWT |
+| GET    | /inventory       | Daftar inventaris |
+| POST   | /borrow          | Peminjaman |
+| GET    | /history/:userId | Riwayat peminjaman |
+
+---
