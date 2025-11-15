@@ -1,0 +1,133 @@
+Lendify – Aplikasi Peminjaman Inventaris Kampus
+
+Dokumentasi ini merupakan README untuk proyek aplikasi Lendify, sesuai dengan Task 6.1. Lendify adalah aplikasi web prototipe untuk manajemen peminjaman inventaris kampus, dengan arsitektur terpisah antara frontend dan backend.
+
+1. Deskripsi Sistem
+
+Lendify adalah aplikasi berbasis web yang terdiri dari:
+
+Frontend: Angular
+
+Backend: Node.js (REST API)
+
+Database: MySQL (melalui XAMPP)
+
+Peran dalam Aplikasi
+
+New User
+
+Membuat akun baru.
+
+Student (Mahasiswa)
+
+Melihat dan mencari item.
+
+Meminjam item (batch, dengan konteks lokasi dan occasion).
+
+Mengembalikan item (batch atau individu).
+
+Admin
+Memiliki seluruh kemampuan Student, ditambah:
+
+CRUD data item.
+
+CRUD user (termasuk soft delete dan recover).
+
+Melihat Borrow Log lengkap.
+
+Akses ke detail tambahan pada Dashboard.
+
+2. Arsitektur Komponen (Model-View-Controller)
+
+Aplikasi menerapkan pola arsitektur MVC yang disesuaikan untuk Angular dan API backend terpisah.
+
+Model
+
+MySQL Database (skema tersedia pada database_restore.sql).
+
+Backend Node.js (server.js) berisi logika bisnis dan operasi database.
+
+Angular Services:
+
+auth.service.ts untuk autentikasi.
+
+api.service.ts untuk komunikasi API.
+
+View
+
+Semua berkas .html dalam folder komponen Angular seperti:
+
+dashboard.component.html
+
+item-list.component.html
+
+Controller
+
+Semua berkas .ts dalam komponen Angular seperti:
+
+dashboard.component.ts
+
+item-list.component.ts
+
+3. Struktur Folder Proyek
+src/app/
+├── auth/                 
+├── borrow-log/           
+├── borrow-return/        
+├── dashboard/            
+├── item-list/            
+├── services/
+│   ├── api.service.ts
+│   └── auth.service.ts
+├── user-list/            
+├── app.component.html
+├── app.component.ts
+├── app.config.ts
+├── app.routes.ts
+├── models.ts
+└── ...
+
+4. Cara Menjalankan Aplikasi
+Prasyarat
+
+Node.js (LTS)
+
+Angular CLI
+
+$ npm install -g @angular/cli
+
+
+XAMPP / MySQL
+
+Langkah 1: Setup Database (MySQL)
+
+Jalankan Apache dan MySQL melalui XAMPP.
+
+Buka phpMyAdmin melalui http://localhost/phpmyadmin.
+
+Buat database bernama lendify_db.
+
+Masuk ke database tersebut, buka tab SQL.
+
+Salin isi file database_restore.sql, kemudian jalankan.
+
+Langkah 2: Menjalankan Backend (Node.js)
+$ cd path/to/project/server
+$ npm install express mysql2 cors
+$ node server.js
+
+
+Backend akan berjalan di:
+
+http://localhost:3000
+
+Langkah 3: Menjalankan Frontend (Angular)
+$ cd path/to/project/LENDIFY
+$ npm install
+$ npm install zone.js
+$ ng serve
+
+
+Aplikasi dapat diakses melalui:
+
+http://localhost:4200
