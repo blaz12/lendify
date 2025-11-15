@@ -5,7 +5,7 @@ Aplikasi ini memiliki fitur login, register, manajemen inventaris, peminjaman, r
 
 ---
 
-##Daftar Isi
+## Daftar Isi
 - Fitur Utama
 - Teknologi yang Digunakan
 - Struktur Project
@@ -16,7 +16,7 @@ Aplikasi ini memiliki fitur login, register, manajemen inventaris, peminjaman, r
 
 ---
 
-##Fitur Utama
+## Fitur Utama
 - Login & Register (dengan JWT + bcrypt)
 - Daftar inventaris kampus
 - Sistem peminjaman
@@ -27,7 +27,7 @@ Aplikasi ini memiliki fitur login, register, manajemen inventaris, peminjaman, r
 
 ---
 
-##Teknologi yang Digunakan
+## Teknologi yang Digunakan
 
 **Frontend**
 - Angular 16  
@@ -46,7 +46,7 @@ Aplikasi ini memiliki fitur login, register, manajemen inventaris, peminjaman, r
 
 ---
 
-##Struktur Project
+## Struktur Project
 ```
 lendify/
 │
@@ -64,7 +64,7 @@ lendify/
 
 ---
 
-##Instalasi & Menjalankan Aplikasi
+## Instalasi & Menjalankan Aplikasi
 
 ### 1. Clone Repository
 ```bash
